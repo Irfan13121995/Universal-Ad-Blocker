@@ -5,69 +5,145 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sinkhole - Windows Network Ad & Tracker Filter</title>
   <style>
+    /* -------------------------------------------------------------
+       APPLE DESIGN & FLUID INTERFACE TOKENS
+       WWDC Designing Fluid Interfaces & Design Engineering Principles
+       ------------------------------------------------------------- */
     :root {
-      --bg: #0b0f17;
-      --card-bg: #131b2a;
-      --card-border: #1e293b;
-      --card-hover: #192338;
-      --text-main: #f1f5f9;
-      --text-muted: #94a3b8;
-      --accent-blue: #38bdf8;
-      --accent-cyan: #06b6d4;
-      --accent-green: #10b981;
-      --accent-red: #ef4444;
-      --accent-amber: #f59e0b;
-      --accent-purple: #8b5cf6;
-      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      /* Typography & Font Sizing */
+      --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Roboto, system-ui, sans-serif;
+      --font-mono: "SF Mono", "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
+
+      /* Dark Mode Palette with Translucency */
+      --bg-base: #06090e;
+      --bg-ambient-blue: rgba(10, 132, 255, 0.05);
+      --bg-ambient-purple: rgba(191, 90, 242, 0.04);
+      --bg-ambient-emerald: rgba(48, 209, 88, 0.04);
+
+      /* Dynamic Glass Materials */
+      --glass-sidebar: rgba(11, 17, 29, 0.75);
+      --glass-topbar: rgba(11, 17, 29, 0.82);
+      --glass-card: rgba(17, 25, 42, 0.58);
+      --glass-card-hover: rgba(24, 35, 58, 0.72);
+      --glass-input: rgba(8, 13, 23, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-border-hover: rgba(255, 255, 255, 0.16);
+      --glass-highlight: rgba(255, 255, 255, 0.12);
+
+      /* Apple System Hues (Dark Mode Vibrancy) */
+      --apple-blue: #0A84FF;
+      --apple-blue-glow: rgba(10, 132, 255, 0.35);
+      --apple-green: #30D158;
+      --apple-green-glow: rgba(48, 209, 88, 0.35);
+      --apple-red: #FF453A;
+      --apple-red-glow: rgba(255, 69, 58, 0.35);
+      --apple-amber: #FF9F0A;
+      --apple-amber-glow: rgba(255, 159, 10, 0.35);
+      --apple-purple: #BF5AF2;
+      --apple-purple-glow: rgba(191, 90, 242, 0.35);
+      --apple-teal: #64D2FF;
+      --apple-indigo: #5E5CE6;
+
+      /* Text Hierarchy */
+      --text-primary: #F5F5F7;
+      --text-secondary: #98989D;
+      --text-tertiary: #636366;
+      --text-inverse: #000000;
+
+      /* Spring Constants */
+      --spring-crit: cubic-bezier(0.16, 1, 0.3, 1);
+      --spring-overshoot: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      --spring-press: cubic-bezier(0.2, 0, 0, 1);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-pill: 9999px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    /* Base Reset */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
     body {
-      background-color: var(--bg);
-      color: var(--text-main);
-      font-family: var(--font);
+      background-color: var(--bg-base);
+      background-image:
+        radial-gradient(circle at 10% 15%, var(--bg-ambient-blue) 0%, transparent 45%),
+        radial-gradient(circle at 85% 25%, var(--bg-ambient-purple) 0%, transparent 40%),
+        radial-gradient(circle at 50% 85%, var(--bg-ambient-emerald) 0%, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-primary);
+      font-family: var(--font-system);
+      font-size: 14px;
+      line-height: 1.45;
+      letter-spacing: -0.006em;
       min-height: 100vh;
       display: flex;
+      overflow: hidden;
     }
 
-    /* Sidebar */
+    /* Tabular numbers for counters, latency and timestamps */
+    .num-tnum {
+      font-feature-settings: "tnum" 1, "cv02" 1;
+    }
+
+    /* -------------------------------------------------------------
+       1. TRANSLUCENT FLOATING SIDEBAR
+       ------------------------------------------------------------- */
     aside {
-      width: 250px;
-      background: #0f172a;
-      border-right: 1px solid var(--card-border);
+      width: 260px;
+      background: var(--glass-sidebar);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border-right: 1px solid var(--glass-border);
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
+      z-index: 50;
+      user-select: none;
     }
+
     .brand {
-      padding: 1.5rem 1.25rem;
+      padding: 1.4rem 1.25rem;
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      border-bottom: 1px solid var(--card-border);
+      gap: 0.85rem;
+      border-bottom: 1px solid var(--glass-border);
     }
+
     .brand-logo {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
-      border-radius: 8px;
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #0A84FF 0%, #5E5CE6 100%);
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 800;
-      color: #0b0f17;
-      font-size: 1.15rem;
+      color: #ffffff;
+      font-size: 1.2rem;
+      box-shadow: 0 4px 14px var(--apple-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      letter-spacing: -0.03em;
     }
+
     .brand-title {
       font-weight: 700;
-      font-size: 1.1rem;
-      letter-spacing: -0.02em;
+      font-size: 1.12rem;
+      letter-spacing: -0.025em;
+      color: var(--text-primary);
     }
+
     .brand-sub {
-      font-size: 0.7rem;
-      color: var(--accent-blue);
+      font-size: 0.72rem;
+      color: var(--apple-teal);
+      font-weight: 600;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
     }
 
     nav {
@@ -76,242 +152,382 @@
       flex-direction: column;
       gap: 0.25rem;
       flex: 1;
+      overflow-y: auto;
     }
+
     .nav-btn {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.7rem 0.85rem;
-      color: var(--text-muted);
-      border-radius: 6px;
-      border: none;
-      background: none;
+      gap: 0.85rem;
+      padding: 0.65rem 0.85rem;
+      color: var(--text-secondary);
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      background: transparent;
       cursor: pointer;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-weight: 500;
       text-align: left;
-      transition: all 0.15s ease;
       width: 100%;
+      position: relative;
+      transition: background 160ms var(--spring-crit), color 160ms var(--spring-crit), border-color 160ms;
     }
-    .nav-btn:hover {
-      background: var(--card-bg);
-      color: var(--text-main);
-    }
-    .nav-btn.active {
-      background: #1e293b;
-      color: var(--accent-blue);
-      font-weight: 600;
-    }
+
     .nav-btn svg {
       width: 18px;
       height: 18px;
       stroke-width: 2;
+      flex-shrink: 0;
+      transition: transform 180ms var(--spring-crit);
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-primary);
+    }
+
+    .nav-btn:active {
+      transform: scale(0.97);
+      transition: transform 80ms var(--spring-press);
+    }
+
+    .nav-btn.active {
+      background: rgba(10, 132, 255, 0.12);
+      color: var(--apple-blue);
+      font-weight: 600;
+      border-color: rgba(10, 132, 255, 0.25);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .nav-btn.active svg {
+      transform: scale(1.06);
     }
 
     .sidebar-footer {
-      padding: 1rem;
-      border-top: 1px solid var(--card-border);
-      font-size: 0.75rem;
-      color: var(--text-muted);
+      padding: 1.1rem 1.25rem;
+      border-top: 1px solid var(--glass-border);
+      font-size: 0.76rem;
+      color: var(--text-secondary);
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.15);
     }
+
     .status-pill {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.5rem;
-      background: rgba(16, 185, 129, 0.1);
-      color: var(--accent-green);
-      border-radius: 9999px;
-      font-size: 0.75rem;
+      gap: 0.5rem;
+      padding: 0.28rem 0.65rem;
+      background: rgba(48, 209, 88, 0.12);
+      color: var(--apple-green);
+      border-radius: var(--radius-pill);
+      font-size: 0.72rem;
       font-weight: 600;
+      letter-spacing: 0.02em;
+      border: 1px solid rgba(48, 209, 88, 0.25);
       width: fit-content;
     }
+
     .status-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
       background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulseGlow 2.5s infinite ease-in-out;
     }
 
-    /* Main Container */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+
+    /* -------------------------------------------------------------
+       2. MAIN VIEW CONTAINER & FLOATING TOPBAR
+       ------------------------------------------------------------- */
     main {
       flex: 1;
-      padding: 2rem;
+      height: 100vh;
       overflow-y: auto;
-      max-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
     }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: var(--glass-topbar);
+      backdrop-filter: blur(24px) saturate(190%);
+      -webkit-backdrop-filter: blur(24px) saturate(190%);
+      border-bottom: 1px solid var(--glass-border);
+      padding: 1.15rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .view-title {
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: -0.028em;
+      color: var(--text-primary);
+    }
+
+    .view-desc {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-top: 0.15rem;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    /* -------------------------------------------------------------
+       3. APPLE HARDWARE SPRING SWITCH (iOS Physics)
+       ------------------------------------------------------------- */
+    .apple-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      user-select: none;
+      background: var(--glass-card);
+      border: 1px solid var(--glass-border);
+      padding: 0.35rem 0.85rem;
+      border-radius: var(--radius-pill);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+      transition: background 180ms, border-color 180ms;
+    }
+
+    .apple-switch:hover {
+      border-color: var(--glass-border-hover);
+      background: var(--glass-card-hover);
+    }
+
+    .apple-switch:active {
+      transform: scale(0.97);
+      transition: transform 80ms var(--spring-press);
+    }
+
+    .apple-switch-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .apple-switch input {
+      display: none;
+    }
+
+    .apple-switch-track {
+      width: 44px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: var(--radius-pill);
+      position: relative;
+      transition: background 250ms var(--spring-crit), box-shadow 250ms;
+    }
+
+    .apple-switch-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      transition: transform 300ms var(--spring-overshoot), width 120ms;
+    }
+
+    .apple-switch:active .apple-switch-thumb {
+      width: 24px;
+    }
+
+    .apple-switch input:checked + .apple-switch-track {
+      background: var(--apple-green);
+      box-shadow: 0 0 14px var(--apple-green-glow);
+    }
+
+    .apple-switch input:checked + .apple-switch-track .apple-switch-thumb {
+      transform: translateX(20px);
+    }
+
+    /* -------------------------------------------------------------
+       4. INTERACTIVE VIEW PANELS & TRANSITIONS
+       ------------------------------------------------------------- */
     .view-container {
       display: none;
-      max-width: 1280px;
+      padding: 2rem;
+      max-width: 1320px;
+      width: 100%;
       margin: 0 auto;
+      animation: viewSlideIn 320ms var(--spring-crit) forwards;
+      will-change: transform, opacity;
     }
+
     .view-container.active {
       display: block;
     }
 
-    /* Header Bar */
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--card-border);
-    }
-    .view-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    .view-desc {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-top: 0.25rem;
-    }
-    .topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
+    @keyframes viewSlideIn {
+      0% {
+        opacity: 0;
+        transform: translateY(6px) scale(0.995);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
     }
 
-    /* Protection Switch */
-    .switch-label {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 600;
-      background: var(--card-bg);
-      padding: 0.45rem 0.85rem;
-      border-radius: 8px;
-      border: 1px solid var(--card-border);
-    }
-    .toggle {
-      position: relative;
-      width: 40px;
-      height: 22px;
-      background: #334155;
-      border-radius: 9999px;
-      transition: background 0.2s;
-    }
-    .toggle::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 18px;
-      height: 18px;
-      background: white;
-      border-radius: 50%;
-      transition: transform 0.2s;
-    }
-    input[type="checkbox"]:checked + .toggle {
-      background: var(--accent-green);
-    }
-    input[type="checkbox"]:checked + .toggle::after {
-      transform: translateX(18px);
-    }
-    input[type="checkbox"] { display: none; }
-
-    /* Cards */
+    /* -------------------------------------------------------------
+       5. TELEMETRY CARDS & OPTICAL METRICS
+       ------------------------------------------------------------- */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1.2rem;
       margin-bottom: 2rem;
     }
+
     .stat-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 1.25rem;
+      background: var(--glass-card);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 1.35rem 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 0.45rem;
       position: relative;
       overflow: hidden;
+      box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0, 0, 0, 0.28);
+      transition: transform 240ms var(--spring-crit), border-color 240ms, box-shadow 240ms;
     }
-    .stat-card::before {
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--glass-border-hover);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 12px 32px rgba(0, 0, 0, 0.38);
+    }
+
+    .stat-card::after {
       content: '';
       position: absolute;
       top: 0;
       left: 0;
-      width: 4px;
-      height: 100%;
-      background: var(--card-border);
+      right: 0;
+      height: 3px;
+      background: transparent;
+      transition: background 200ms;
     }
-    .stat-card.blue::before { background: var(--accent-blue); }
-    .stat-card.red::before { background: var(--accent-red); }
-    .stat-card.green::before { background: var(--accent-green); }
-    .stat-card.amber::before { background: var(--accent-amber); }
-    .stat-card.purple::before { background: var(--accent-purple); }
+
+    .stat-card.blue::after { background: linear-gradient(90deg, var(--apple-blue), var(--apple-teal)); }
+    .stat-card.red::after { background: linear-gradient(90deg, var(--apple-red), #FF6961); }
+    .stat-card.green::after { background: linear-gradient(90deg, var(--apple-green), #68D391); }
+    .stat-card.amber::after { background: linear-gradient(90deg, var(--apple-amber), #F6AD55); }
+    .stat-card.purple::after { background: linear-gradient(90deg, var(--apple-purple), #9F7AEA); }
 
     .stat-title {
-      font-size: 0.8rem;
-      color: var(--text-muted);
+      font-size: 0.73rem;
+      color: var(--text-secondary);
       text-transform: uppercase;
       font-weight: 600;
-      letter-spacing: 0.05em;
-    }
-    .stat-value {
-      font-size: 1.85rem;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-    }
-    .stat-sub {
-      font-size: 0.75rem;
-      color: var(--text-muted);
+      letter-spacing: 0.04em;
     }
 
-    /* Chart */
-    .chart-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
+    .stat-value {
+      font-size: 2.25rem;
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+      color: var(--text-primary);
+      font-feature-settings: "tnum" 1, "cv02" 1;
+      margin: 0.15rem 0;
     }
+
+    .stat-sub {
+      font-size: 0.77rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* -------------------------------------------------------------
+       6. INTERACTIVE 24-HOUR TIMELINE & SCRUBBER
+       ------------------------------------------------------------- */
+    .chart-card {
+      background: var(--glass-card);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 1.6rem;
+      margin-bottom: 2rem;
+      box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0, 0, 0, 0.28);
+      position: relative;
+    }
+
     .chart-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.4rem;
     }
+
     .chart-title {
-      font-size: 1rem;
+      font-size: 1.05rem;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
+
     .chart-legend {
       display: flex;
-      gap: 1rem;
-      font-size: 0.75rem;
-      color: var(--text-muted);
+      gap: 1.25rem;
+      font-size: 0.76rem;
+      color: var(--text-secondary);
     }
+
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.45rem;
+      font-weight: 500;
     }
+
     .legend-box {
       width: 10px;
       height: 10px;
-      border-radius: 2px;
+      border-radius: 3px;
     }
-    .legend-box.total { background: var(--accent-blue); }
-    .legend-box.blocked { background: var(--accent-red); }
+
+    .legend-box.total { background: var(--apple-blue); box-shadow: 0 0 6px var(--apple-blue-glow); }
+    .legend-box.blocked { background: var(--apple-red); box-shadow: 0 0 6px var(--apple-red-glow); }
+
+    .chart-bars-wrap {
+      position: relative;
+      height: 160px;
+      border-bottom: 1px solid var(--glass-border);
+      padding-top: 1rem;
+    }
 
     .chart-bars {
       display: flex;
       align-items: flex-end;
       gap: 6px;
-      height: 150px;
-      padding-top: 1rem;
-      border-bottom: 1px solid var(--card-border);
+      height: 100%;
+      width: 100%;
     }
+
     .bar-col {
       flex: 1;
       height: 100%;
@@ -320,270 +536,470 @@
       justify-content: flex-end;
       position: relative;
       cursor: pointer;
+      border-radius: 4px 4px 0 0;
+      transition: background 120ms;
     }
-    .bar-col:hover::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      bottom: 105%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1e293b;
-      color: white;
-      padding: 0.3rem 0.5rem;
-      font-size: 0.7rem;
-      border-radius: 4px;
-      white-space: nowrap;
-      z-index: 10;
-      border: 1px solid var(--card-border);
+
+    .bar-col:hover {
+      background: rgba(255, 255, 255, 0.04);
     }
+
     .bar-fill {
       width: 100%;
-      background: var(--accent-blue);
-      border-radius: 3px 3px 0 0;
+      background: linear-gradient(to top, rgba(10, 132, 255, 0.25), var(--apple-blue));
+      border-radius: 4px 4px 0 0;
       position: relative;
-      min-height: 2px;
-      transition: height 0.3s;
+      min-height: 3px;
+      transition: height 300ms var(--spring-crit);
     }
+
     .bar-fill-blocked {
       position: absolute;
       bottom: 0;
       width: 100%;
-      background: var(--accent-red);
-      border-radius: 3px 3px 0 0;
+      background: linear-gradient(to top, rgba(255, 69, 58, 0.5), var(--apple-red));
+      border-radius: 4px 4px 0 0;
       min-height: 2px;
+      box-shadow: 0 0 8px var(--apple-red-glow);
     }
+
+    /* Floating Magnetic Scrubber Tooltip */
+    #chartScrubberTooltip {
+      position: absolute;
+      top: 12px;
+      left: 0;
+      pointer-events: none;
+      background: rgba(18, 27, 44, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border-hover);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      padding: 0.45rem 0.85rem;
+      border-radius: var(--radius-md);
+      font-size: 0.75rem;
+      white-space: nowrap;
+      z-index: 20;
+      opacity: 0;
+      transform: translateX(-50%) translateY(0);
+      transition: opacity 160ms, transform 160ms var(--spring-crit);
+    }
+
+    #chartScrubberTooltip.visible {
+      opacity: 1;
+    }
+
     .chart-labels {
       display: flex;
       justify-content: space-between;
-      margin-top: 0.5rem;
-      font-size: 0.7rem;
-      color: var(--text-muted);
+      margin-top: 0.75rem;
+      font-size: 0.74rem;
+      color: var(--text-secondary);
+      font-weight: 500;
     }
 
-    /* Rank grids */
+    /* -------------------------------------------------------------
+       7. RANKINGS & PROPORTION METERS
+       ------------------------------------------------------------- */
     .ranks-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 1.5rem;
       margin-bottom: 2rem;
     }
+
     .rank-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 1.25rem;
+      background: var(--glass-card);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 1.4rem;
+      box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0, 0, 0, 0.28);
     }
+
     .rank-title {
       font-size: 0.95rem;
       font-weight: 600;
+      letter-spacing: -0.015em;
       margin-bottom: 1rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
+
     .rank-list {
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
+      gap: 0.5rem;
     }
+
     .rank-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 0.85rem;
-      padding: 0.4rem 0.5rem;
-      border-radius: 6px;
+      font-size: 0.84rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: var(--radius-sm);
       background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      position: relative;
+      overflow: hidden;
+      transition: background 150ms;
     }
+
+    .rank-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
     .rank-key {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       max-width: 220px;
-      font-family: monospace;
-    }
-    .rank-val {
-      font-weight: 600;
-      color: var(--text-muted);
-      background: #1e293b;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
     }
 
-    /* Tables */
+    .rank-val {
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.06);
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.74rem;
+      font-feature-settings: "tnum" 1;
+    }
+
+    /* -------------------------------------------------------------
+       8. TABLES & LIVE INSPECTION STREAMS
+       ------------------------------------------------------------- */
     .table-container {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
+      background: var(--glass-card);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
       overflow: hidden;
       margin-bottom: 2rem;
+      box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0, 0, 0, 0.28);
     }
+
     .table-toolbar {
-      padding: 1rem 1.25rem;
+      padding: 1.1rem 1.4rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 1rem;
-      border-bottom: 1px solid var(--card-border);
+      border-bottom: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.015);
       flex-wrap: wrap;
     }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       text-align: left;
     }
+
     th {
-      padding: 0.85rem 1.25rem;
-      background: #0f172a;
-      color: var(--text-muted);
+      padding: 0.9rem 1.25rem;
+      background: rgba(0, 0, 0, 0.25);
+      color: var(--text-secondary);
       font-weight: 600;
       text-transform: uppercase;
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       letter-spacing: 0.05em;
-      border-bottom: 1px solid var(--card-border);
+      border-bottom: 1px solid var(--glass-border);
+      user-select: none;
     }
+
     td {
       padding: 0.85rem 1.25rem;
-      border-bottom: 1px solid var(--card-border);
-      color: var(--text-main);
+      border-bottom: 1px solid var(--glass-border);
+      color: var(--text-primary);
+      transition: background 120ms;
     }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: var(--card-hover); }
 
-    /* Badges */
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255, 255, 255, 0.03); }
+
+    /* Animated entry for new live streaming rows */
+    .row-animate-enter {
+      animation: rowFadeSlide 280ms var(--spring-crit) forwards;
+    }
+
+    @keyframes rowFadeSlide {
+      from {
+        opacity: 0;
+        background: rgba(10, 132, 255, 0.12);
+        transform: translateY(-4px);
+      }
+      to {
+        opacity: 1;
+        background: transparent;
+        transform: translateY(0);
+      }
+    }
+
+    /* -------------------------------------------------------------
+       9. STATUS BADGES & CAPSULES
+       ------------------------------------------------------------- */
     .badge {
       display: inline-flex;
       align-items: center;
-      padding: 0.2rem 0.55rem;
-      border-radius: 4px;
-      font-size: 0.72rem;
+      gap: 0.4rem;
+      padding: 0.24rem 0.65rem;
+      border-radius: var(--radius-pill);
+      font-size: 0.7rem;
       font-weight: 600;
       text-transform: uppercase;
+      letter-spacing: 0.03em;
+      border: 1px solid transparent;
     }
-    .badge.allowed { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); }
-    .badge.blocked { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
-    .badge.cached { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); }
-    .badge.error { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
 
-    /* Forms & Inputs */
+    .badge-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .badge.allowed {
+      background: rgba(48, 209, 88, 0.12);
+      color: var(--apple-green);
+      border-color: rgba(48, 209, 88, 0.25);
+    }
+
+    .badge.blocked {
+      background: rgba(255, 69, 58, 0.12);
+      color: var(--apple-red);
+      border-color: rgba(255, 69, 58, 0.25);
+    }
+
+    .badge.cached {
+      background: rgba(10, 132, 255, 0.12);
+      color: var(--apple-blue);
+      border-color: rgba(10, 132, 255, 0.25);
+    }
+
+    .badge.error {
+      background: rgba(255, 159, 10, 0.12);
+      color: var(--apple-amber);
+      border-color: rgba(255, 159, 10, 0.25);
+    }
+
+    /* -------------------------------------------------------------
+       10. INPUTS, BUTTONS & FORM ELEMENTS
+       ------------------------------------------------------------- */
     .input-group {
       display: flex;
-      gap: 0.5rem;
+      gap: 0.65rem;
       align-items: center;
     }
+
     input[type="text"], input[type="number"], select, textarea {
-      background: #0f172a;
-      border: 1px solid var(--card-border);
-      color: var(--text-main);
-      padding: 0.55rem 0.85rem;
-      border-radius: 6px;
+      background: var(--glass-input);
+      border: 1px solid var(--glass-border);
+      color: var(--text-primary);
+      padding: 0.55rem 0.95rem;
+      border-radius: var(--radius-sm);
       font-size: 0.85rem;
       font-family: inherit;
       outline: none;
-      transition: border 0.15s;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+      transition: border-color 150ms, box-shadow 150ms;
     }
-    input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
-      border-color: var(--accent-blue);
-    }
-    textarea { width: 100%; min-height: 80px; resize: vertical; }
 
-    /* Buttons */
+    input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+      border-color: var(--apple-blue);
+      box-shadow: 0 0 0 3px var(--apple-blue-glow);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      resize: vertical;
+    }
+
     .btn {
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.55rem 0.95rem;
-      border-radius: 6px;
-      border: none;
+      padding: 0.55rem 1.05rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       font-weight: 600;
-      transition: all 0.15s ease;
       white-space: nowrap;
+      user-select: none;
+      transition: transform 80ms var(--spring-press), background 160ms, border-color 160ms, box-shadow 160ms;
     }
-    .btn-primary { background: var(--accent-blue); color: #0b0f17; }
-    .btn-primary:hover { background: #0284c7; }
-    .btn-secondary { background: #1e293b; color: var(--text-main); }
-    .btn-secondary:hover { background: #334155; }
-    .btn-danger { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
-    .btn-danger:hover { background: var(--accent-red); color: white; }
-    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
 
-    /* Panels / Settings Section */
-    .panel {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
+    .btn:active {
+      transform: scale(0.96);
     }
+
+    .btn-primary {
+      background: linear-gradient(180deg, #0A84FF 0%, #0071E3 100%);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 12px var(--apple-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(180deg, #1A8EFF 0%, #0A7AE5 100%);
+      box-shadow: 0 6px 16px var(--apple-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+      border-color: var(--glass-border);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: var(--glass-border-hover);
+    }
+
+    .btn-danger {
+      background: rgba(255, 69, 58, 0.15);
+      color: var(--apple-red);
+      border-color: rgba(255, 69, 58, 0.25);
+    }
+
+    .btn-danger:hover {
+      background: var(--apple-red);
+      color: #ffffff;
+      box-shadow: 0 4px 12px var(--apple-red-glow);
+    }
+
+    .btn-sm {
+      padding: 0.32rem 0.7rem;
+      font-size: 0.75rem;
+      border-radius: 6px;
+    }
+
+    /* -------------------------------------------------------------
+       11. PANELS & SECTIONS
+       ------------------------------------------------------------- */
+    .panel {
+      background: var(--glass-card);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 1.6rem;
+      margin-bottom: 1.5rem;
+      box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0, 0, 0, 0.28);
+    }
+
     .panel-title {
-      font-size: 1.1rem;
-      font-weight: 600;
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.022em;
       margin-bottom: 0.25rem;
     }
+
     .panel-sub {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-bottom: 1.25rem;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-bottom: 1.4rem;
     }
+
     .form-row {
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
+      gap: 0.45rem;
       margin-bottom: 1.25rem;
     }
+
     .form-row label {
       font-size: 0.8rem;
       font-weight: 600;
-      color: var(--text-muted);
-    }
-    .form-help {
-      font-size: 0.75rem;
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
 
-    /* Modal / Popups */
+    .form-help {
+      font-size: 0.74rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+
+    .code-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--glass-border);
+      border-radius: 6px;
+      padding: 0.65rem 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--apple-teal);
+      overflow-x: auto;
+    }
+
+    /* -------------------------------------------------------------
+       12. SONNER-GRADE FLUID TOAST SYSTEM
+       ------------------------------------------------------------- */
     .toast {
       position: fixed;
       bottom: 2rem;
       right: 2rem;
-      background: #1e293b;
-      color: white;
-      padding: 0.75rem 1.25rem;
-      border-radius: 8px;
-      border: 1px solid var(--accent-blue);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      background: rgba(22, 33, 54, 0.94);
+      backdrop-filter: blur(24px) saturate(200%);
+      -webkit-backdrop-filter: blur(24px) saturate(200%);
+      color: #ffffff;
+      padding: 0.85rem 1.4rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--apple-blue);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
       z-index: 1000;
-      transform: translateY(100px);
+      transform: translateY(30px) scale(0.92);
       opacity: 0;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      font-size: 0.85rem;
+      pointer-events: none;
+      transition: transform 320ms var(--spring-crit), opacity 240ms;
+      font-size: 0.86rem;
+      font-weight: 500;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.65rem;
     }
+
     .toast.show {
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
       opacity: 1;
+      pointer-events: auto;
     }
-    .code-box {
-      background: #0f172a;
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
-      padding: 0.75rem;
-      font-family: monospace;
-      font-size: 0.8rem;
-      color: var(--accent-cyan);
-      overflow-x: auto;
+
+    /* -------------------------------------------------------------
+       13. ACCESSIBILITY ENGINES
+       ------------------------------------------------------------- */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        transform: none !important;
+      }
+      .view-container {
+        animation: none !important;
+      }
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+      aside, .topbar, .stat-card, .chart-card, .table-container, .panel, .toast {
+        background: #0f172a !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
     }
   </style>
 </head>
 <body>
 
-  <!-- Sidebar -->
+  <!-- Translucent Floating Sidebar -->
   <aside>
     <div class="brand">
       <div class="brand-logo">S</div>
@@ -635,12 +1051,12 @@
         <span class="status-dot"></span>
         <span id="dnsStatusText">DNS Active (Port 53)</span>
       </div>
-      <div>Engine Version: <span id="serverVersion">1.0.0</span></div>
-      <div>Rules Active: <span id="activeRulesCount" style="color:var(--accent-blue);font-weight:600;">0</span></div>
+      <div>Engine Version: <span id="serverVersion" class="num-tnum">1.0.0</span></div>
+      <div>Rules Active: <span id="activeRulesCount" class="num-tnum" style="color:var(--apple-teal);font-weight:600;">0</span></div>
     </div>
   </aside>
 
-  <!-- Main Content -->
+  <!-- Main View Container -->
   <main>
 
     <!-- Topbar (Common) -->
@@ -650,11 +1066,15 @@
         <div class="view-desc" id="pageDesc">Real-time Windows DNS sinkhole metrics and filtering activity.</div>
       </div>
       <div class="topbar-actions">
-        <label class="switch-label">
-          <span>Sinkhole Protection</span>
+        <!-- Apple Spring Switch -->
+        <label class="apple-switch" title="Toggle global sinkhole protection">
           <input type="checkbox" id="protectionToggle" onchange="toggleProtection(this.checked)">
-          <div class="toggle"></div>
+          <div class="apple-switch-track">
+            <div class="apple-switch-thumb"></div>
+          </div>
+          <span class="apple-switch-label">Sinkhole Protection</span>
         </label>
+
         <button class="btn btn-secondary btn-sm" onclick="refreshCurrentView()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v9h-9"/></svg>
           Refresh
@@ -667,32 +1087,32 @@
       <div class="stats-grid">
         <div class="stat-card blue">
           <div class="stat-title">Total Queries (Today)</div>
-          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-value num-tnum" id="statTotal">0</div>
           <div class="stat-sub">Across all local clients</div>
         </div>
         <div class="stat-card red">
           <div class="stat-title">Queries Blocked</div>
-          <div class="stat-value" id="statBlocked">0</div>
-          <div class="stat-sub" id="statBlockedPct">0.0% sinkholed</div>
+          <div class="stat-value num-tnum" id="statBlocked">0</div>
+          <div class="stat-sub num-tnum" id="statBlockedPct">0.0% sinkholed</div>
         </div>
         <div class="stat-card green">
           <div class="stat-title">Cache Hit Rate</div>
-          <div class="stat-value" id="statCached">0</div>
+          <div class="stat-value num-tnum" id="statCached">0</div>
           <div class="stat-sub">0ms local response</div>
         </div>
         <div class="stat-card amber">
           <div class="stat-title">Avg Upstream Latency</div>
-          <div class="stat-value" id="statLatency">0 ms</div>
+          <div class="stat-value num-tnum" id="statLatency">0 ms</div>
           <div class="stat-sub">Via secure DoH/UDP</div>
         </div>
         <div class="stat-card purple">
           <div class="stat-title">Uptime</div>
-          <div class="stat-value" id="statUptime">0m</div>
+          <div class="stat-value num-tnum" id="statUptime">0m</div>
           <div class="stat-sub">Windows Service</div>
         </div>
       </div>
 
-      <!-- Activity Timeline -->
+      <!-- Interactive 24-Hour Timeline -->
       <div class="chart-card">
         <div class="chart-header">
           <div class="chart-title">24-Hour Query Volume & Block Rate</div>
@@ -701,7 +1121,10 @@
             <div class="legend-item"><span class="legend-box blocked"></span> Blocked Queries</div>
           </div>
         </div>
-        <div class="chart-bars" id="histogramBars"></div>
+        <div class="chart-bars-wrap" id="chartBarsWrap">
+          <div class="chart-bars" id="histogramBars"></div>
+          <div id="chartScrubberTooltip">Hover over bar to inspect</div>
+        </div>
         <div class="chart-labels">
           <span>24 hours ago</span>
           <span>12 hours ago</span>
@@ -714,23 +1137,23 @@
         <div class="rank-card">
           <div class="rank-title">
             <span>Top Permitted Domains</span>
-            <span style="font-size:0.75rem; color:var(--text-muted)">Volume</span>
+            <span style="font-size:0.75rem; color:var(--text-secondary)">Volume</span>
           </div>
-          <div class="rank-list" id="rankTopDomains"><div style="color:var(--text-muted); font-size:0.8rem;">No queries recorded yet.</div></div>
+          <div class="rank-list" id="rankTopDomains"><div style="color:var(--text-secondary); font-size:0.8rem;">No queries recorded yet.</div></div>
         </div>
         <div class="rank-card">
           <div class="rank-title">
-            <span style="color:var(--accent-red)">Top Blocked Domains</span>
-            <span style="font-size:0.75rem; color:var(--text-muted)">Blocked Hits</span>
+            <span style="color:var(--apple-red)">Top Blocked Domains</span>
+            <span style="font-size:0.75rem; color:var(--text-secondary)">Blocked Hits</span>
           </div>
-          <div class="rank-list" id="rankTopBlocked"><div style="color:var(--text-muted); font-size:0.8rem;">No blocked queries yet.</div></div>
+          <div class="rank-list" id="rankTopBlocked"><div style="color:var(--text-secondary); font-size:0.8rem;">No blocked queries yet.</div></div>
         </div>
         <div class="rank-card">
           <div class="rank-title">
             <span>Active Network Clients</span>
-            <span style="font-size:0.75rem; color:var(--text-muted)">Queries</span>
+            <span style="font-size:0.75rem; color:var(--text-secondary)">Queries</span>
           </div>
-          <div class="rank-list" id="rankTopClients"><div style="color:var(--text-muted); font-size:0.8rem;">No clients recorded yet.</div></div>
+          <div class="rank-list" id="rankTopClients"><div style="color:var(--text-secondary); font-size:0.8rem;">No clients recorded yet.</div></div>
         </div>
       </div>
     </div>
@@ -768,7 +1191,7 @@
             </tr>
           </thead>
           <tbody id="queryLogBody">
-            <tr><td colspan="9" style="text-align:center; color:var(--text-muted)">Waiting for DNS queries...</td></tr>
+            <tr><td colspan="9" style="text-align:center; color:var(--text-secondary)">Waiting for DNS queries...</td></tr>
           </tbody>
         </table>
       </div>
@@ -789,7 +1212,7 @@
       <div class="table-container">
         <div class="table-toolbar">
           <div>
-            <strong>Active Subscriptions</strong> (<span id="blocklistCount">0</span>)
+            <strong>Active Subscriptions</strong> (<span id="blocklistCount" class="num-tnum">0</span>)
           </div>
           <button class="btn btn-secondary btn-sm" onclick="updateAllBlocklists()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v9h-9"/></svg>
@@ -808,7 +1231,7 @@
             </tr>
           </thead>
           <tbody id="blocklistTableBody">
-            <tr><td colspan="6" style="text-align:center; color:var(--text-muted)">Loading subscriptions...</td></tr>
+            <tr><td colspan="6" style="text-align:center; color:var(--text-secondary)">Loading subscriptions...</td></tr>
           </tbody>
         </table>
       </div>
@@ -833,8 +1256,8 @@
           </div>
           <div class="form-row" style="margin:0">
             <label>Subdomains</label>
-            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; font-weight:normal; margin-top:0.4rem;">
-              <input type="checkbox" id="ruleSubdomains" checked style="display:inline"> Include all (*.domain)
+            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; font-weight:normal; margin-top:0.4rem; cursor:pointer;">
+              <input type="checkbox" id="ruleSubdomains" checked style="width:16px; height:16px;"> Include all (*.domain)
             </label>
           </div>
           <div class="form-row" style="margin:0">
@@ -853,7 +1276,7 @@
           <input type="text" id="testDomainInput" placeholder="test.doubleclick.net" style="flex:1">
           <button class="btn btn-secondary" onclick="testDomainMatch()">Check Match</button>
         </div>
-        <div id="testDomainResult" style="margin-top:0.75rem; font-size:0.85rem; display:none;"></div>
+        <div id="testDomainResult" style="margin-top:0.85rem; font-size:0.85rem; display:none; padding:0.75rem; border-radius:var(--radius-sm); background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);"></div>
       </div>
 
       <div class="table-container">
@@ -872,7 +1295,7 @@
             </tr>
           </thead>
           <tbody id="rulesTableBody">
-            <tr><td colspan="6" style="text-align:center; color:var(--text-muted)">Loading custom rules...</td></tr>
+            <tr><td colspan="6" style="text-align:center; color:var(--text-secondary)">Loading custom rules...</td></tr>
           </tbody>
         </table>
       </div>
@@ -910,13 +1333,13 @@
         </div>
 
         <!-- Upstream latency tester -->
-        <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--card-border);">
-          <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted)">Test Upstream Speed</label>
+        <div style="margin-top:1.25rem; padding-top:1.25rem; border-top:1px solid var(--glass-border);">
+          <label style="font-size:0.8rem; font-weight:600; color:var(--text-secondary)">Test Upstream Speed</label>
           <div style="display:flex; gap:0.5rem; margin-top:0.4rem;">
             <input type="text" id="testUpstreamInput" placeholder="https://cloudflare-dns.com/dns-query" style="flex:1;">
             <button class="btn btn-secondary btn-sm" onclick="testUpstreamLatency()">Ping Upstream</button>
           </div>
-          <div id="testUpstreamResult" style="font-size:0.8rem; margin-top:0.4rem;"></div>
+          <div id="testUpstreamResult" style="font-size:0.8rem; margin-top:0.5rem;"></div>
         </div>
       </div>
 
@@ -941,7 +1364,7 @@
           </div>
         </div>
 
-        <div style="display:flex; gap:1rem; margin-top:1rem; align-items:center;">
+        <div style="display:flex; gap:1rem; margin-top:1.25rem; align-items:center;">
           <button class="btn btn-primary" onclick="saveSettings()">Save DNS Settings</button>
           <button class="btn btn-secondary" onclick="flushCache()">Flush In-Memory Cache</button>
         </div>
@@ -966,7 +1389,7 @@
               </tr>
             </thead>
             <tbody id="adapterTableBody">
-              <tr><td colspan="6" style="text-align:center; color:var(--text-muted)">Scanning network interfaces...</td></tr>
+              <tr><td colspan="6" style="text-align:center; color:var(--text-secondary)">Scanning network interfaces...</td></tr>
             </tbody>
           </table>
         </div>
@@ -979,10 +1402,10 @@
         <div style="display:flex; flex-direction:column; gap:1rem; font-size:0.9rem; line-height:1.6;">
           <p>
             This Windows 11 host is currently reachable on your local LAN at:
-            <span id="lanIpAddresses" style="font-weight:700; color:var(--accent-cyan); font-family:monospace;">Scanning...</span>
+            <span id="lanIpAddresses" style="font-weight:700; color:var(--apple-teal); font-family:var(--font-mono);">Scanning...</span>
           </p>
 
-          <ol style="padding-left:1.5rem; display:flex; flex-direction:column; gap:0.5rem;">
+          <ol style="padding-left:1.5rem; display:flex; flex-direction:column; gap:0.6rem;">
             <li>Log in to your home router admin portal (typically <code class="code-box">http://192.168.1.1</code> or <code class="code-box">http://192.168.0.1</code>).</li>
             <li>Navigate to <strong>Network / LAN / DHCP Server Settings</strong>.</li>
             <li>Locate the <strong>Primary DNS Server</strong> field and set it to this Windows PC's static LAN IP address (shown above).</li>
@@ -1000,44 +1423,53 @@
         <div class="panel-title">YouTube Shield & Video Ad Defusal</div>
         <div class="panel-sub">Deep payload interception that strips video prerolls, midrolls, and promotions from YouTube across all desktop browsers.</div>
         
-        <div style="display:flex; flex-direction:column; gap:1.25rem; margin-top:1.5rem;">
-          <label class="switch-label" style="justify-content:space-between; width:100%;">
+        <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1.5rem;">
+          
+          <label class="apple-switch" style="justify-content:space-between; width:100%; border-radius:var(--radius-md); padding:0.85rem 1.15rem;">
             <div>
-              <div style="font-weight:600;">Enable YouTube Shield</div>
-              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Master switch for deep YouTube player API sanitization and cosmetic defusal.</div>
+              <div style="font-weight:600; font-size:0.9rem;">Enable YouTube Shield</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">Master switch for deep YouTube player API sanitization and cosmetic defusal.</div>
             </div>
             <input type="checkbox" id="ytEnableToggle">
-            <div class="toggle"></div>
+            <div class="apple-switch-track">
+              <div class="apple-switch-thumb"></div>
+            </div>
           </label>
 
-          <label class="switch-label" style="justify-content:space-between; width:100%;">
+          <label class="apple-switch" style="justify-content:space-between; width:100%; border-radius:var(--radius-md); padding:0.85rem 1.15rem;">
             <div>
-              <div style="font-weight:600;">Strip Video Ads (Prerolls & Midrolls)</div>
-              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Removes adPlacements, playerAds, and adSlots from /youtubei/v1/player JSON.</div>
+              <div style="font-weight:600; font-size:0.9rem;">Strip Video Ads (Prerolls & Midrolls)</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">Removes adPlacements, playerAds, and adSlots from /youtubei/v1/player JSON.</div>
             </div>
             <input type="checkbox" id="ytPrerollsToggle" checked>
-            <div class="toggle"></div>
+            <div class="apple-switch-track">
+              <div class="apple-switch-thumb"></div>
+            </div>
           </label>
 
-          <label class="switch-label" style="justify-content:space-between; width:100%;">
+          <label class="apple-switch" style="justify-content:space-between; width:100%; border-radius:var(--radius-md); padding:0.85rem 1.15rem;">
             <div>
-              <div style="font-weight:600;">Hide Banners, Masthead & Sponsored Search Cards</div>
-              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Injects cosmetic CSS rules to eliminate UI ad clutter and home page promotions.</div>
+              <div style="font-weight:600; font-size:0.9rem;">Hide Banners, Masthead & Sponsored Search Cards</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">Injects cosmetic CSS rules to eliminate UI ad clutter and home page promotions.</div>
             </div>
             <input type="checkbox" id="ytBannersToggle" checked>
-            <div class="toggle"></div>
+            <div class="apple-switch-track">
+              <div class="apple-switch-thumb"></div>
+            </div>
           </label>
 
-          <label class="switch-label" style="justify-content:space-between; width:100%;">
+          <label class="apple-switch" style="justify-content:space-between; width:100%; border-radius:var(--radius-md); padding:0.85rem 1.15rem;">
             <div>
-              <div style="font-weight:600;">Hide YouTube Shorts Shelf</div>
-              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Cleanses the home page and subscription feeds of short-form video shelves.</div>
+              <div style="font-weight:600; font-size:0.9rem;">Hide YouTube Shorts Shelf</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">Cleanses the home page and subscription feeds of short-form video shelves.</div>
             </div>
             <input type="checkbox" id="ytShortsToggle">
-            <div class="toggle"></div>
+            <div class="apple-switch-track">
+              <div class="apple-switch-thumb"></div>
+            </div>
           </label>
 
-          <div style="margin-top:0.5rem;">
+          <div style="margin-top:0.75rem;">
             <button class="btn btn-primary" onclick="saveYouTubeConfig()">Save YouTube Settings</button>
           </div>
         </div>
@@ -1045,11 +1477,11 @@
 
       <div class="panel">
         <div class="panel-title">How YouTube Ad Defusal Works</div>
-        <div style="font-size:0.85rem; color:var(--text-muted); line-height:1.6; margin-top:0.5rem;">
-          <p style="margin-bottom:0.5rem;">
+        <div style="font-size:0.85rem; color:var(--text-secondary); line-height:1.6; margin-top:0.5rem;">
+          <p style="margin-bottom:0.6rem;">
             1. <strong>Zero Playback Buffering:</strong> Video streams (<code class="code-box">*.googlevideo.com/videoplayback</code>) pass through a direct, zero-copy TCP tunnel. The proxy never re-encodes media chunks, preserving full 4K 60fps and 8K HDR throughput.
           </p>
-          <p style="margin-bottom:0.5rem;">
+          <p style="margin-bottom:0.6rem;">
             2. <strong>Player API Sanitization:</strong> When your browser requests <code class="code-box">POST /youtubei/v1/player</code>, Sinkhole intercepts the response, deletes all ad cues, and returns the sanitized payload. YouTube's frontend player starts the video immediately with 0 ads scheduled.
           </p>
           <p>
@@ -1066,12 +1498,12 @@
         <div class="panel-sub">Inspect and filter HTTPS traffic across Chrome, Edge, Brave, and Firefox without browser security warnings.</div>
         
         <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:1rem; border-radius:8px; border:1px solid var(--card-border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); padding:1rem 1.25rem; border-radius:var(--radius-md); border:1px solid var(--glass-border);">
             <div>
-              <div style="font-weight:600;" id="caSubject">Sinkhole HTTPS Filtering Root CA</div>
-              <div style="font-size:0.75rem; color:var(--text-muted);" id="caDetails">Checking certificate status...</div>
+              <div style="font-weight:600; font-size:0.95rem;" id="caSubject">Sinkhole HTTPS Filtering Root CA</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.25rem;" id="caDetails">Checking certificate status...</div>
             </div>
-            <span class="badge allowed" id="caTrustBadge">Checking...</span>
+            <span class="badge allowed" id="caTrustBadge"><span class="badge-dot"></span> Checking...</span>
           </div>
 
           <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
@@ -1089,19 +1521,19 @@
         <div class="panel-title">Windows 11 System Proxy & PAC Controller</div>
         <div class="panel-sub">Direct all desktop browsers to the local inspection proxy (127.0.0.1:8080) with automatic local bypass.</div>
         
-        <div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:1rem; border-radius:8px; border:1px solid var(--card-border); margin-top:1rem; margin-bottom:1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); padding:1rem 1.25rem; border-radius:var(--radius-md); border:1px solid var(--glass-border); margin-top:1rem; margin-bottom:1rem;">
           <div>
-            <div style="font-weight:600;" id="proxyStatusTitle">System Proxy Status</div>
-            <div style="font-size:0.75rem; color:var(--text-muted);" id="proxyStatusDetails">Inspecting Windows proxy configuration...</div>
+            <div style="font-weight:600; font-size:0.95rem;" id="proxyStatusTitle">System Proxy Status</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.25rem;" id="proxyStatusDetails">Inspecting Windows proxy configuration...</div>
           </div>
-          <div style="display:flex; gap:0.5rem;">
+          <div style="display:flex; gap:0.6rem;">
             <button class="btn btn-primary btn-sm" id="enableProxyBtn" onclick="enableSystemProxy()">Activate Proxy</button>
             <button class="btn btn-secondary btn-sm" id="disableProxyBtn" onclick="disableSystemProxy()">Disable Proxy</button>
           </div>
         </div>
 
-        <div style="font-size:0.8rem; color:var(--text-muted);">
-          PAC Auto-Config URL: <a href="/proxy.pac" target="_blank" style="color:var(--accent-blue);">http://127.0.0.1:3000/proxy.pac</a> (Automatically excludes intranet, 192.168.*, and banking domains).
+        <div style="font-size:0.8rem; color:var(--text-secondary);">
+          PAC Auto-Config URL: <a href="/proxy.pac" target="_blank" style="color:var(--apple-blue); font-weight:500;">http://127.0.0.1:3000/proxy.pac</a> (Automatically excludes intranet, 192.168.*, and banking domains).
         </div>
       </div>
     </div>
@@ -1115,8 +1547,8 @@
           <input type="text" id="newCosmeticRuleInput" placeholder="example.com##.sponsor-banner or ##.global-ad" style="flex:1; min-width:300px;" required>
           <button type="submit" class="btn btn-primary">+ Add Cosmetic Rule</button>
         </form>
-        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem;">
-          Active in-page cosmetic rules loaded: <strong style="color:var(--accent-blue);" id="cosmeticRulesCount">0</strong>
+        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.65rem;">
+          Active in-page cosmetic rules loaded: <strong style="color:var(--apple-blue);" id="cosmeticRulesCount" class="num-tnum">0</strong>
         </div>
       </div>
 
@@ -1142,7 +1574,7 @@
             </tr>
           </thead>
           <tbody id="inspectorTableBody">
-            <tr><td colspan="7" style="text-align:center; color:var(--text-muted)">Waiting for HTTP/HTTPS proxy traffic...</td></tr>
+            <tr><td colspan="7" style="text-align:center; color:var(--text-secondary)">Waiting for HTTP/HTTPS proxy traffic...</td></tr>
           </tbody>
         </table>
       </div>
@@ -1150,10 +1582,16 @@
 
   </main>
 
-  <div id="toast" class="toast">Action completed</div>
+  <!-- Fluid Sonner-Grade Toast -->
+  <div id="toast" class="toast">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+    <span id="toastMsg">Action completed</span>
+  </div>
 
   <script>
-    // State
+    // -------------------------------------------------------------
+    // STATE & ROUTING
+    // -------------------------------------------------------------
     let currentView = 'overview';
     let sseSource = null;
     let logPaused = false;
@@ -1173,15 +1611,49 @@
       network: { title: 'Adapters & Home Router Guide', desc: 'Configure local Windows 11 adapters and home router DHCP distribution.' }
     };
 
+    // -------------------------------------------------------------
+    // FLUID MICRO-SPRING ANIMATIONS & COUNTERS
+    // -------------------------------------------------------------
+    function animateCounter(elementId, targetValue, suffix = '') {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const start = typeof el._currentVal === 'number' ? el._currentVal : 0;
+      const diff = targetValue - start;
+      if (diff === 0 && el.textContent) return;
+
+      const duration = 400; // ms
+      const startTime = performance.now();
+
+      function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Critically damped spring approximation
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(start + diff * ease);
+        el.textContent = current.toLocaleString() + suffix;
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          el._currentVal = targetValue;
+          el.textContent = targetValue.toLocaleString() + suffix;
+        }
+      }
+      requestAnimationFrame(step);
+    }
+
     function showToast(msg, isError = false) {
       const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.style.borderColor = isError ? 'var(--accent-red)' : 'var(--accent-blue)';
+      const text = document.getElementById('toastMsg');
+      text.textContent = msg;
+      t.style.borderColor = isError ? 'var(--apple-red)' : 'var(--apple-blue)';
       t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 3500);
+      clearTimeout(t._hideTimer);
+      t._hideTimer = setTimeout(() => t.classList.remove('show'), 3500);
     }
 
     function switchView(viewName) {
+      if (currentView === viewName) return;
       currentView = viewName;
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.view-container').forEach(c => c.classList.remove('active'));
@@ -1190,7 +1662,9 @@
       if (activeBtn) activeBtn.classList.add('active');
 
       const target = document.getElementById(`view-${viewName}`);
-      if (target) target.classList.add('active');
+      if (target) {
+        target.classList.add('active');
+      }
 
       document.getElementById('pageTitle').textContent = views[viewName].title;
       document.getElementById('pageDesc').textContent = views[viewName].desc;
@@ -1211,7 +1685,9 @@
       if (currentView === 'network') fetchAdapters();
     }
 
-    // API Calls
+    // -------------------------------------------------------------
+    // API CALL HELPER
+    // -------------------------------------------------------------
     async function api(path, options = {}) {
       options.headers = {
         'Content-Type': 'application/json',
@@ -1226,7 +1702,9 @@
       return res.json();
     }
 
-    // Status & SSE
+    // -------------------------------------------------------------
+    // STATUS & CORE METRICS
+    // -------------------------------------------------------------
     async function fetchStatus() {
       try {
         const data = await api('/api/status');
@@ -1247,29 +1725,28 @@
     async function toggleProtection(enabled) {
       try {
         await api('/api/protection', { method: 'POST', body: JSON.stringify({ enabled }) });
-        showToast(`Protection ${enabled ? 'Enabled' : 'Disabled'}`);
+        showToast(`Sinkhole Protection ${enabled ? 'Enabled' : 'Disabled'}`);
       } catch (err) {
         showToast(err.message, true);
       }
     }
 
-    // Overview Stats
+    // -------------------------------------------------------------
+    // OVERVIEW & INTERACTIVE TIMELINE SCRUBBING
+    // -------------------------------------------------------------
     async function fetchStats() {
       try {
         const s = await api('/api/stats?top=8');
-        document.getElementById('statTotal').textContent = s.total.toLocaleString();
-        document.getElementById('statBlocked').textContent = s.blocked.toLocaleString();
+        animateCounter('statTotal', s.total || 0);
+        animateCounter('statBlocked', s.blocked || 0);
         document.getElementById('statBlockedPct').textContent = `${(s.blocked_pct || 0).toFixed(1)}% sinkholed`;
-        document.getElementById('statCached').textContent = s.cached.toLocaleString();
+        animateCounter('statCached', s.cached || 0);
         document.getElementById('statLatency').textContent = `${Math.round(s.avg_upstream_ms || 0)} ms`;
         
         const mins = Math.floor((s.uptime_sec || 0) / 60);
         document.getElementById('statUptime').textContent = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
 
-        // Render Histogram
         renderHistogram(s.hours || []);
-
-        // Render Top Permitted
         renderRankList('rankTopDomains', s.top_domains || []);
         renderRankList('rankTopBlocked', s.top_blocked || [], true);
         renderRankList('rankTopClients', s.top_clients || []);
@@ -1280,45 +1757,70 @@
 
     function renderHistogram(hours) {
       const container = document.getElementById('histogramBars');
+      const tooltip = document.getElementById('chartScrubberTooltip');
       if (!hours || hours.length === 0) {
-        container.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;margin:auto">No query history yet</div>';
+        container.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem;margin:auto">No query history yet</div>';
         return;
       }
       let maxTotal = 1;
       hours.forEach(h => { if (h.total > maxTotal) maxTotal = h.total; });
 
-      container.innerHTML = hours.map(h => {
-        const totalPct = Math.max((h.total / maxTotal) * 100, 2);
+      container.innerHTML = hours.map((h, i) => {
+        const totalPct = Math.max((h.total / maxTotal) * 100, 3);
         const blockedPct = h.total > 0 ? (h.blocked / h.total) * 100 : 0;
         const d = new Date(h.ts * 1000);
         const timeStr = `${d.getHours()}:00`;
-        const tip = `${timeStr} - ${h.total} queries (${h.blocked} blocked)`;
 
         return `
-          <div class="bar-col" data-tooltip="${tip}">
+          <div class="bar-col" data-idx="${i}" data-time="${timeStr}" data-total="${h.total}" data-blocked="${h.blocked}">
             <div class="bar-fill" style="height:${totalPct}%">
               <div class="bar-fill-blocked" style="height:${blockedPct}%"></div>
             </div>
           </div>
         `;
       }).join('');
+
+      // Magnetic hover tracking
+      const wrap = document.getElementById('chartBarsWrap');
+      container.querySelectorAll('.bar-col').forEach(col => {
+        col.addEventListener('pointerenter', (e) => {
+          const time = col.dataset.time;
+          const total = parseInt(col.dataset.total, 10).toLocaleString();
+          const blocked = parseInt(col.dataset.blocked, 10).toLocaleString();
+          const pct = col.dataset.total > 0 ? ((col.dataset.blocked / col.dataset.total) * 100).toFixed(1) : 0;
+          
+          tooltip.innerHTML = `<strong>${time}</strong>: ${total} queries (${blocked} blocked · ${pct}%)`;
+          tooltip.classList.add('visible');
+
+          const colRect = col.getBoundingClientRect();
+          const wrapRect = wrap.getBoundingClientRect();
+          const x = colRect.left + colRect.width / 2 - wrapRect.left;
+          tooltip.style.left = `${x}px`;
+        });
+      });
+
+      wrap.addEventListener('pointerleave', () => {
+        tooltip.classList.remove('visible');
+      });
     }
 
     function renderRankList(elemId, items, isBlocked = false) {
       const el = document.getElementById(elemId);
       if (!items || items.length === 0) {
-        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem">No data recorded yet.</div>';
+        el.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem">No data recorded yet.</div>';
         return;
       }
       el.innerHTML = items.map(item => `
         <div class="rank-item">
           <span class="rank-key" title="${item.key}">${item.key}</span>
-          <span class="rank-val" style="${isBlocked ? 'color:var(--accent-red)' : ''}">${item.count.toLocaleString()}</span>
+          <span class="rank-val" style="${isBlocked ? 'color:var(--apple-red)' : ''}">${item.count.toLocaleString()}</span>
         </div>
       `).join('');
     }
 
-    // Query Log
+    // -------------------------------------------------------------
+    // QUERY LOG
+    // -------------------------------------------------------------
     async function fetchQueryLog() {
       try {
         const rows = await api('/api/querylog?limit=50');
@@ -1343,7 +1845,7 @@
     function renderQueryLogTable(rows) {
       const tbody = document.getElementById('queryLogBody');
       if (!rows || rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--text-muted)">No matching DNS queries.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--text-secondary)">No matching DNS queries.</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map(r => {
@@ -1355,15 +1857,15 @@
 
         const latency = (r.latency_us / 1000).toFixed(1) + 'ms';
         return `
-          <tr>
-            <td style="color:var(--text-muted); font-size:0.75rem">${timeStr}</td>
-            <td><code style="color:var(--accent-cyan)">${r.client}</code></td>
+          <tr class="row-animate-enter">
+            <td style="color:var(--text-secondary); font-size:0.75rem" class="num-tnum">${timeStr}</td>
+            <td><code style="color:var(--apple-teal); cursor:pointer;" onclick="copyText('${r.client}')" title="Click to copy">${r.client}</code></td>
             <td><span style="font-weight:600;font-size:0.75rem;">${r.qtype}</span></td>
             <td><strong>${r.domain}</strong></td>
-            <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
-            <td style="color:var(--text-muted);font-size:0.75rem">${r.reason || (r.upstream ? 'Forwarded: ' + r.upstream : 'Allowed')}</td>
-            <td style="font-family:monospace">${latency}</td>
-            <td style="color:var(--text-muted);font-size:0.75rem">${r.answer || '-'}</td>
+            <td><span class="badge ${badgeClass}"><span class="badge-dot"></span> ${badgeLabel}</span></td>
+            <td style="color:var(--text-secondary);font-size:0.75rem">${r.reason || (r.upstream ? 'Forwarded: ' + r.upstream : 'Allowed')}</td>
+            <td style="font-family:var(--font-mono)" class="num-tnum">${latency}</td>
+            <td style="color:var(--text-secondary);font-size:0.75rem">${r.answer || '-'}</td>
             <td>
               ${r.status === 'blocked' ? 
                 `<button class="btn btn-secondary btn-sm" onclick="quickRule('${r.domain}', 'allow')">Whitelist</button>` :
@@ -1373,6 +1875,12 @@
           </tr>
         `;
       }).join('');
+    }
+
+    function copyText(str) {
+      navigator.clipboard.writeText(str).then(() => {
+        showToast(`Copied ${str} to clipboard`);
+      });
     }
 
     function toggleLogPause() {
@@ -1405,7 +1913,9 @@
       }
     }
 
-    // Blocklists
+    // -------------------------------------------------------------
+    // BLOCKLISTS
+    // -------------------------------------------------------------
     async function fetchBlocklists() {
       try {
         const data = await api('/api/blocklists');
@@ -1413,7 +1923,7 @@
         document.getElementById('blocklistCount').textContent = lists.length;
         const tbody = document.getElementById('blocklistTableBody');
         if (lists.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted)">No blocklists configured.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-secondary)">No blocklists configured.</td></tr>';
           return;
         }
         tbody.innerHTML = lists.map(l => {
@@ -1421,14 +1931,14 @@
           return `
             <tr>
               <td>
-                <input type="checkbox" ${l.enabled ? 'checked' : ''} onchange="toggleBlocklist(${l.id}, this.checked)" style="display:inline; width:16px; height:16px; cursor:pointer;">
+                <input type="checkbox" ${l.enabled ? 'checked' : ''} onchange="toggleBlocklist(${l.id}, this.checked)" style="width:16px; height:16px; cursor:pointer;">
               </td>
               <td><strong>${l.name}</strong></td>
-              <td><span style="font-family:monospace; font-size:0.75rem; color:var(--text-muted)">${l.url}</span></td>
-              <td><span style="color:var(--accent-blue);font-weight:600">${(l.rule_count || 0).toLocaleString()}</span></td>
-              <td style="color:var(--text-muted);font-size:0.75rem">
+              <td><span style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-secondary)">${l.url}</span></td>
+              <td><span style="color:var(--apple-blue);font-weight:600" class="num-tnum">${(l.rule_count || 0).toLocaleString()}</span></td>
+              <td style="color:var(--text-secondary);font-size:0.75rem" class="num-tnum">
                 ${updated}
-                ${l.last_error ? `<div style="color:var(--accent-red);font-size:0.7rem">${l.last_error}</div>` : ''}
+                ${l.last_error ? `<div style="color:var(--apple-red);font-size:0.7rem">${l.last_error}</div>` : ''}
               </td>
               <td style="display:flex; gap:0.4rem;">
                 <button class="btn btn-secondary btn-sm" onclick="updateBlocklist(${l.id})">Update</button>
@@ -1499,22 +2009,24 @@
       }
     }
 
-    // Custom Rules
+    // -------------------------------------------------------------
+    // CUSTOM RULES & MATCH TESTER
+    // -------------------------------------------------------------
     async function fetchRules() {
       try {
         const rules = await api('/api/rules');
         const tbody = document.getElementById('rulesTableBody');
         if (!rules || rules.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted)">No custom rules configured yet.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-secondary)">No custom rules configured yet.</td></tr>';
           return;
         }
         tbody.innerHTML = rules.map(r => `
           <tr>
-            <td><span class="badge ${r.action === 'block' ? 'blocked' : 'allowed'}">${r.action}</span></td>
+            <td><span class="badge ${r.action === 'block' ? 'blocked' : 'allowed'}"><span class="badge-dot"></span> ${r.action}</span></td>
             <td><strong>${r.domain}</strong></td>
-            <td>${r.subdomains ? '<span style="color:var(--accent-blue)">Yes (*.' + r.domain + ')</span>' : 'Exact match only'}</td>
-            <td style="color:var(--text-muted)">${r.comment || '-'}</td>
-            <td style="color:var(--text-muted);font-size:0.75rem">${new Date(r.created_at).toLocaleDateString()}</td>
+            <td>${r.subdomains ? '<span style="color:var(--apple-blue)">Yes (*.' + r.domain + ')</span>' : 'Exact match only'}</td>
+            <td style="color:var(--text-secondary)">${r.comment || '-'}</td>
+            <td style="color:var(--text-secondary);font-size:0.75rem" class="num-tnum">${new Date(r.created_at).toLocaleDateString()}</td>
             <td><button class="btn btn-danger btn-sm" onclick="deleteRule(${r.id})">Delete</button></td>
           </tr>
         `).join('');
@@ -1558,17 +2070,19 @@
         const out = await api(`/api/check?domain=${encodeURIComponent(d)}`);
         resEl.style.display = 'block';
         if (out.result.blocked) {
-          resEl.innerHTML = `<span style="color:var(--accent-red);font-weight:700">❌ BLOCKED</span> by <strong>${out.result.list_name || 'Blocklist'}</strong> (Rule: <code>${out.result.rule}</code>)`;
+          resEl.innerHTML = `<span style="color:var(--apple-red);font-weight:700">❌ BLOCKED</span> by <strong>${out.result.list_name || 'Blocklist'}</strong> (Rule: <code>${out.result.rule}</code>)`;
         } else {
-          resEl.innerHTML = `<span style="color:var(--accent-green);font-weight:700">✅ PERMITTED</span> ${out.result.reason ? '(' + out.result.reason + ')' : '(Not in any active blocklist)'}`;
+          resEl.innerHTML = `<span style="color:var(--apple-green);font-weight:700">✅ PERMITTED</span> ${out.result.reason ? '(' + out.result.reason + ')' : '(Not in any active blocklist)'}`;
         }
       } catch (err) {
         resEl.style.display = 'block';
-        resEl.innerHTML = `<span style="color:var(--accent-amber)">Error: ${err.message}</span>`;
+        resEl.innerHTML = `<span style="color:var(--apple-amber)">Error: ${err.message}</span>`;
       }
     }
 
-    // Settings
+    // -------------------------------------------------------------
+    // DNS SETTINGS & RESOLVERS
+    // -------------------------------------------------------------
     async function fetchSettings() {
       try {
         serverConfig = await api('/api/settings');
@@ -1621,34 +2135,36 @@
       try {
         const out = await api('/api/upstreams/test', { method: 'POST', body: JSON.stringify({ upstream: u }) });
         if (out.ok) {
-          resEl.innerHTML = `<span style="color:var(--accent-green);font-weight:600">Reachable: ${out.latency_ms.toFixed(1)} ms</span> (Resolved example.com to ${out.answer})`;
+          resEl.innerHTML = `<span style="color:var(--apple-green);font-weight:600">Reachable: ${out.latency_ms.toFixed(1)} ms</span> (Resolved example.com to ${out.answer})`;
         } else {
-          resEl.innerHTML = `<span style="color:var(--accent-red)">Failed: ${out.error}</span>`;
+          resEl.innerHTML = `<span style="color:var(--apple-red)">Failed: ${out.error}</span>`;
         }
       } catch (err) {
-        resEl.innerHTML = `<span style="color:var(--accent-red)">Error: ${err.message}</span>`;
+        resEl.innerHTML = `<span style="color:var(--apple-red)">Error: ${err.message}</span>`;
       }
     }
 
-    // Network & Adapters
+    // -------------------------------------------------------------
+    // NETWORK ADAPTERS
+    // -------------------------------------------------------------
     async function fetchAdapters() {
       const tbody = document.getElementById('adapterTableBody');
       try {
         const list = await api('/api/system/adapters');
         if (!list || list.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted)">No active network adapters found.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-secondary)">No active network adapters found.</td></tr>';
           return;
         }
         tbody.innerHTML = list.map(a => `
           <tr>
             <td><strong>${a.alias}</strong></td>
-            <td style="color:var(--text-muted);font-size:0.75rem">${a.description}</td>
-            <td><span class="badge ${a.status === 'Up' ? 'allowed' : 'error'}">${a.status}</span></td>
+            <td style="color:var(--text-secondary);font-size:0.75rem">${a.description}</td>
+            <td><span class="badge ${a.status === 'Up' ? 'allowed' : 'error'}"><span class="badge-dot"></span> ${a.status}</span></td>
             <td><code style="font-size:0.8rem">${(a.ipv4_dns || []).join(', ') || 'DHCP'}</code></td>
             <td>
               ${a.uses_sinkhole ? 
-                '<span class="badge allowed">Active (127.0.0.1)</span>' : 
-                '<span style="color:var(--text-muted);font-size:0.8rem">No</span>'
+                '<span class="badge allowed"><span class="badge-dot"></span> Active (127.0.0.1)</span>' : 
+                '<span style="color:var(--text-secondary);font-size:0.8rem">No</span>'
               }
             </td>
             <td>
@@ -1660,7 +2176,7 @@
           </tr>
         `).join('');
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--accent-amber)">Adapter query requires elevated privileges or service mode: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--apple-amber)">Adapter query requires elevated privileges: ${err.message}</td></tr>`;
       }
     }
 
@@ -1684,7 +2200,9 @@
       }
     }
 
-    // YouTube Shield
+    // -------------------------------------------------------------
+    // YOUTUBE SHIELD
+    // -------------------------------------------------------------
     async function fetchYouTubeConfig() {
       try {
         const c = await api('/api/youtube');
@@ -1712,17 +2230,19 @@
       }
     }
 
-    // HTTPS & Root CA
+    // -------------------------------------------------------------
+    // HTTPS & ROOT CA
+    // -------------------------------------------------------------
     async function fetchCAStatus() {
       try {
         const c = await api('/api/ca/status');
         const badge = document.getElementById('caTrustBadge');
         if (c.trusted) {
           badge.className = 'badge allowed';
-          badge.textContent = 'Trusted in Windows Store';
+          badge.innerHTML = '<span class="badge-dot"></span> Trusted in Windows Store';
         } else {
           badge.className = 'badge error';
-          badge.textContent = 'Not Trusted / Pending Install';
+          badge.innerHTML = '<span class="badge-dot"></span> Not Trusted / Pending Install';
         }
         document.getElementById('caSubject').textContent = c.subject || 'Sinkhole Local CA';
         const expStr = c.expires ? new Date(c.expires).toLocaleDateString() : 'Unknown';
@@ -1762,14 +2282,13 @@
       window.open('/api/ca/cert', '_blank');
     }
 
-    // Windows System Proxy
     async function fetchProxyStatus() {
       try {
         const p = await api('/api/proxy/status');
         const isEnabled = p.system_proxy && p.system_proxy.enabled;
         document.getElementById('proxyStatusTitle').textContent = isEnabled ?
           'Windows System Proxy: ACTIVE' : 'Windows System Proxy: DISABLED';
-        document.getElementById('proxyStatusTitle').style.color = isEnabled ? 'var(--accent-green)' : 'var(--text-muted)';
+        document.getElementById('proxyStatusTitle').style.color = isEnabled ? 'var(--apple-green)' : 'var(--text-secondary)';
         document.getElementById('proxyStatusDetails').textContent = isEnabled ?
           `Browser traffic routing through proxy at ${p.proxy_listen} (AutoConfig: ${p.system_proxy.auto_config_url || 'None'})` :
           'Direct internet connection active. Click Activate to route browser traffic through Sinkhole.';
@@ -1798,7 +2317,9 @@
       }
     }
 
-    // Cosmetic Rules & Inspector
+    // -------------------------------------------------------------
+    // COSMETIC RULES & INSPECTOR
+    // -------------------------------------------------------------
     async function fetchCosmeticRules() {
       try {
         const c = await api('/api/cosmetic/rules');
@@ -1825,7 +2346,7 @@
     function renderInspectorTable(events) {
       const tbody = document.getElementById('inspectorTableBody');
       if (!events || events.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">No proxy transactions recorded yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-secondary)">No proxy transactions recorded yet.</td></tr>';
         return;
       }
       tbody.innerHTML = events.map(ev => {
@@ -1837,14 +2358,14 @@
         if (ev.action === 'tunneled') badgeClass = 'error';
 
         return `
-          <tr>
-            <td style="color:var(--text-muted); font-size:0.75rem">${timeStr}</td>
+          <tr class="row-animate-enter">
+            <td style="color:var(--text-secondary); font-size:0.75rem" class="num-tnum">${timeStr}</td>
             <td><span style="font-weight:600;font-size:0.75rem;">${ev.method}</span></td>
             <td><strong>${ev.host}</strong></td>
-            <td style="font-family:monospace; font-size:0.75rem; color:var(--text-muted); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${ev.path}</td>
-            <td><span class="badge ${badgeClass}">${ev.action}</span></td>
+            <td style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-secondary); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${ev.path}</td>
+            <td><span class="badge ${badgeClass}"><span class="badge-dot"></span> ${ev.action}</span></td>
             <td style="font-size:0.8rem">${ev.details}</td>
-            <td><code style="color:var(--accent-cyan); font-size:0.75rem">${ev.client_ip || '127.0.0.1'}</code></td>
+            <td><code style="color:var(--apple-teal); font-size:0.75rem">${ev.client_ip || '127.0.0.1'}</code></td>
           </tr>
         `;
       }).join('');
@@ -1856,7 +2377,9 @@
       showToast('Inspector stream cleared');
     }
 
-    // SSE Setup
+    // -------------------------------------------------------------
+    // SERVER-SENT EVENTS (SSE)
+    // -------------------------------------------------------------
     function setupSSE() {
       if (sseSource) sseSource.close();
       sseSource = new EventSource('/api/events');
@@ -1864,10 +2387,10 @@
         try {
           const data = JSON.parse(e.data);
           if (data.counters && currentView === 'overview') {
-            document.getElementById('statTotal').textContent = data.counters.total.toLocaleString();
-            document.getElementById('statBlocked').textContent = data.counters.blocked.toLocaleString();
+            animateCounter('statTotal', data.counters.total);
+            animateCounter('statBlocked', data.counters.blocked);
             document.getElementById('statBlockedPct').textContent = `${(data.counters.blocked_pct || 0).toFixed(1)}% sinkholed`;
-            document.getElementById('statCached').textContent = data.counters.cached.toLocaleString();
+            animateCounter('statCached', data.counters.cached);
             document.getElementById('statLatency').textContent = `${Math.round(data.counters.avg_upstream_ms || 0)} ms`;
           }
           if (data.queries && data.queries.length > 0 && !logPaused) {
