@@ -1,0 +1,9 @@
+# Temporary files & logs
+*.tmp
+*.log
+*.exe~
+test.pdf
+*render.png
+tmp_chrome/
+chrome_profile/
+edge_profile/
