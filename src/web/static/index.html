@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sinkhole - Windows Network Ad & Tracker Filter</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --card-bg: #131b2a;
+      --card-border: #1e293b;
+      --card-hover: #192338;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* Sidebar */
+    aside {
+      width: 250px;
+      background: #0f172a;
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .brand {
+      padding: 1.5rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #0b0f17;
+      font-size: 1.15rem;
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+    .brand-sub {
+      font-size: 0.7rem;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    nav {
+      padding: 1rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      flex: 1;
+    }
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.7rem 0.85rem;
+      color: var(--text-muted);
+      border-radius: 6px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      text-align: left;
+      transition: all 0.15s ease;
+      width: 100%;
+    }
+    .nav-btn:hover {
+      background: var(--card-bg);
+      color: var(--text-main);
+    }
+    .nav-btn.active {
+      background: #1e293b;
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+    .nav-btn svg {
+      width: 18px;
+      height: 18px;
+      stroke-width: 2;
+    }
+
+    .sidebar-footer {
+      padding: 1rem;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--accent-green);
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      width: fit-content;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+      max-height: 100vh;
+    }
+    .view-container {
+      display: none;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    .view-container.active {
+      display: block;
+    }
+
+    /* Header Bar */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .view-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .view-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    /* Protection Switch */
+    .switch-label {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: var(--card-bg);
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+    }
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      background: #334155;
+      border-radius: 9999px;
+      transition: background 0.2s;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    input[type="checkbox"]:checked + .toggle {
+      background: var(--accent-green);
+    }
+    input[type="checkbox"]:checked + .toggle::after {
+      transform: translateX(18px);
+    }
+    input[type="checkbox"] { display: none; }
+
+    /* Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--card-border);
+    }
+    .stat-card.blue::before { background: var(--accent-blue); }
+    .stat-card.red::before { background: var(--accent-red); }
+    .stat-card.green::before { background: var(--accent-green); }
+    .stat-card.amber::before { background: var(--accent-amber); }
+    .stat-card.purple::before { background: var(--accent-purple); }
+
+    .stat-title {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .stat-value {
+      font-size: 1.85rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Chart */
+    .chart-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+    .chart-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .chart-legend {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .legend-box {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+    .legend-box.total { background: var(--accent-blue); }
+    .legend-box.blocked { background: var(--accent-red); }
+
+    .chart-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 150px;
+      padding-top: 1rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .bar-col {
+      flex: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      position: relative;
+      cursor: pointer;
+    }
+    .bar-col:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 105%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: white;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      z-index: 10;
+      border: 1px solid var(--card-border);
+    }
+    .bar-fill {
+      width: 100%;
+      background: var(--accent-blue);
+      border-radius: 3px 3px 0 0;
+      position: relative;
+      min-height: 2px;
+      transition: height 0.3s;
+    }
+    .bar-fill-blocked {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      background: var(--accent-red);
+      border-radius: 3px 3px 0 0;
+      min-height: 2px;
+    }
+    .chart-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* Rank grids */
+    .ranks-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .rank-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .rank-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .rank-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .rank-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      padding: 0.4rem 0.5rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .rank-key {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 220px;
+      font-family: monospace;
+    }
+    .rank-val {
+      font-weight: 600;
+      color: var(--text-muted);
+      background: #1e293b;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+    }
+
+    /* Tables */
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    .table-toolbar {
+      padding: 1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+    th {
+      padding: 0.85rem 1.25rem;
+      background: #0f172a;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--card-border);
+    }
+    td {
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--card-border);
+      color: var(--text-main);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--card-hover); }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge.allowed { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); }
+    .badge.blocked { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+    .badge.cached { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); }
+    .badge.error { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+
+    /* Forms & Inputs */
+    .input-group {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    input[type="text"], input[type="number"], select, textarea {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+      transition: border 0.15s;
+    }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+      border-color: var(--accent-blue);
+    }
+    textarea { width: 100%; min-height: 80px; resize: vertical; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 0.95rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent-blue); color: #0b0f17; }
+    .btn-primary:hover { background: #0284c7; }
+    .btn-secondary { background: #1e293b; color: var(--text-main); }
+    .btn-secondary:hover { background: #334155; }
+    .btn-danger { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+    .btn-danger:hover { background: var(--accent-red); color: white; }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+
+    /* Panels / Settings Section */
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .panel-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+    }
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 1.25rem;
+    }
+    .form-row label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .form-help {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Modal / Popups */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #1e293b;
+      color: white;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      border: 1px solid var(--accent-blue);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .code-box {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--accent-cyan);
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside>
+    <div class="brand">
+      <div class="brand-logo">S</div>
+      <div>
+        <div class="brand-title">Sinkhole</div>
+        <div class="brand-sub">Windows 11 DNS</div>
+      </div>
+    </div>
+    <nav>
+      <button class="nav-btn active" onclick="switchView('overview')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+        Overview
+      </button>
+      <button class="nav-btn" onclick="switchView('querylog')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v9h-9"/></svg>
+        Live Query Log
+      </button>
+      <button class="nav-btn" onclick="switchView('blocklists')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Blocklists
+      </button>
+      <button class="nav-btn" onclick="switchView('rules')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Custom Rules
+      </button>
+      <button class="nav-btn" onclick="switchView('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        DNS & Upstream
+      </button>
+      <button class="nav-btn" onclick="switchView('network')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        Adapters & Router
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="status-pill">
+        <span class="status-dot"></span>
+        <span id="dnsStatusText">DNS Active (Port 53)</span>
+      </div>
+      <div>Engine Version: <span id="serverVersion">1.0.0</span></div>
+      <div>Rules Active: <span id="activeRulesCount" style="color:var(--accent-blue);font-weight:600;">0</span></div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main>
+
+    <!-- Topbar (Common) -->
+    <div class="topbar">
+      <div>
+        <div class="view-title" id="pageTitle">Overview & Telemetry</div>
+        <div class="view-desc" id="pageDesc">Real-time Windows DNS sinkhole metrics and filtering activity.</div>
+      </div>
+      <div class="topbar-actions">
+        <label class="switch-label">
+          <span>Sinkhole Protection</span>
+          <input type="checkbox" id="protectionToggle" onchange="toggleProtection(this.checked)">
+          <div class="toggle"></div>
+        </label>
+        <button class="btn btn-secondary btn-sm" onclick="refreshCurrentView()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v9h-9"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW 1: OVERVIEW -->
+    <div id="view-overview" class="view-container active">
+      <div class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-title">Total Queries (Today)</div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-sub">Across all local clients</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-title">Queries Blocked</div>
+          <div class="stat-value" id="statBlocked">0</div>
+          <div class="stat-sub" id="statBlockedPct">0.0% sinkholed</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-title">Cache Hit Rate</div>
+          <div class="stat-value" id="statCached">0</div>
+          <div class="stat-sub">0ms local response</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-title">Avg Upstream Latency</div>
+          <div class="stat-value" id="statLatency">0 ms</div>
+          <div class="stat-sub">Via secure DoH/UDP</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-title">Uptime</div>
+          <div class="stat-value" id="statUptime">0m</div>
+          <div class="stat-sub">Windows Service</div>
+        </div>
+      </div>
+
+      <!-- Activity Timeline -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">24-Hour Query Volume & Block Rate</div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-box total"></span> Total Queries</div>
+            <div class="legend-item"><span class="legend-box blocked"></span> Blocked Queries</div>
+          </div>
+        </div>
+        <div class="chart-bars" id="histogramBars"></div>
+        <div class="chart-labels">
+          <span>24 hours ago</span>
+          <span>12 hours ago</span>
+          <span>Now</span>
+        </div>
+      </div>
+
+      <!-- Top rankings -->
+      <div class="ranks-grid">
+        <div class="rank-card">
+          <div class="rank-title">
+            <span>Top Permitted Domains</span>
+            <span style="font-size:0.75rem; color:var(--text-muted)">Volume</span>
+          </div>
+          <div class="rank-list" id="rankTopDomains"><div style="color:var(--text-muted); font-size:0.8rem;">No queries recorded yet.</div></div>
+        </div>
+        <div class="rank-card">
+          <div class="rank-title">
+            <span style="color:var(--accent-red)">Top Blocked Domains</span>
+            <span style="font-size:0.75rem; color:var(--text-muted)">Blocked Hits</span>
+          </div>
+          <div class="rank-list" id="rankTopBlocked"><div style="color:var(--text-muted); font-size:0.8rem;">No blocked queries yet.</div></div>
+        </div>
+        <div class="rank-card">
+          <div class="rank-title">
+            <span>Active Network Clients</span>
+            <span style="font-size:0.75rem; color:var(--text-muted)">Queries</span>
+          </div>
+          <div class="rank-list" id="rankTopClients"><div style="color:var(--text-muted); font-size:0.8rem;">No clients recorded yet.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: LIVE QUERY LOG -->
+    <div id="view-querylog" class="view-container">
+      <div class="table-container">
+        <div class="table-toolbar">
+          <div class="input-group">
+            <input type="text" id="logSearch" placeholder="Filter domain or client IP..." oninput="filterQueryLog()">
+            <select id="logStatusFilter" onchange="filterQueryLog()">
+              <option value="">All Statuses</option>
+              <option value="allowed">Allowed only</option>
+              <option value="blocked">Blocked only</option>
+              <option value="cached">Cached only</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <button class="btn btn-secondary btn-sm" id="pauseLogBtn" onclick="toggleLogPause()">Pause Stream</button>
+            <button class="btn btn-danger btn-sm" onclick="clearQueryLog()">Clear Log</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Client IP</th>
+              <th>Type</th>
+              <th>Requested Domain</th>
+              <th>Status</th>
+              <th>Reason / Rule</th>
+              <th>Latency</th>
+              <th>Answer</th>
+              <th>Quick Action</th>
+            </tr>
+          </thead>
+          <tbody id="queryLogBody">
+            <tr><td colspan="9" style="text-align:center; color:var(--text-muted)">Waiting for DNS queries...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VIEW 3: BLOCKLISTS -->
+    <div id="view-blocklists" class="view-container">
+      <div class="panel">
+        <div class="panel-title">Add Blocklist Subscription</div>
+        <div class="panel-sub">Support standard hosts files, AdBlock-syntax lists (AdGuard/EasyList), and plain domain files.</div>
+        <form onsubmit="addBlocklist(event)" style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <input type="text" id="newListName" placeholder="List Name (e.g. OISD Big, StevenBlack)" style="flex:1; min-width:200px;">
+          <input type="text" id="newListUrl" placeholder="https://raw.githubusercontent.com/.../hosts" style="flex:2; min-width:300px;" required>
+          <button type="submit" class="btn btn-primary">+ Add & Download</button>
+        </form>
+      </div>
+
+      <div class="table-container">
+        <div class="table-toolbar">
+          <div>
+            <strong>Active Subscriptions</strong> (<span id="blocklistCount">0</span>)
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="updateAllBlocklists()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v9h-9"/></svg>
+            Update All Lists Now
+          </button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>List Name</th>
+              <th>Source URL</th>
+              <th>Rule Count</th>
+              <th>Last Updated</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="blocklistTableBody">
+            <tr><td colspan="6" style="text-align:center; color:var(--text-muted)">Loading subscriptions...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VIEW 4: CUSTOM RULES -->
+    <div id="view-rules" class="view-container">
+      <div class="panel">
+        <div class="panel-title">Add Custom Rule / Override</div>
+        <div class="panel-sub">Custom rules take highest precedence over blocklists. Whitelist a domain or immediately sinkhole one.</div>
+        <form onsubmit="addCustomRule(event)" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) 120px; gap:0.75rem; align-items:end;">
+          <div class="form-row" style="margin:0">
+            <label>Domain</label>
+            <input type="text" id="ruleDomain" placeholder="ads.example.com or ||example.org^" required>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label>Action</label>
+            <select id="ruleAction">
+              <option value="block">Block (Sinkhole)</option>
+              <option value="allow">Allow (Whitelist)</option>
+            </select>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label>Subdomains</label>
+            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; font-weight:normal; margin-top:0.4rem;">
+              <input type="checkbox" id="ruleSubdomains" checked style="display:inline"> Include all (*.domain)
+            </label>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label>Comment</label>
+            <input type="text" id="ruleComment" placeholder="e.g. Smart TV telemetry">
+          </div>
+          <button type="submit" class="btn btn-primary" style="height:38px;">Add Rule</button>
+        </form>
+      </div>
+
+      <!-- Domain Test Tool -->
+      <div class="panel">
+        <div class="panel-title">Domain Match Tester</div>
+        <div class="panel-sub">Check if a domain is blocked or allowed by the current rules and which list caused the match.</div>
+        <div style="display:flex; gap:0.75rem; align-items:center;">
+          <input type="text" id="testDomainInput" placeholder="test.doubleclick.net" style="flex:1">
+          <button class="btn btn-secondary" onclick="testDomainMatch()">Check Match</button>
+        </div>
+        <div id="testDomainResult" style="margin-top:0.75rem; font-size:0.85rem; display:none;"></div>
+      </div>
+
+      <div class="table-container">
+        <div class="table-toolbar">
+          <strong>Custom Overrides & User Rules</strong>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Domain Pattern</th>
+              <th>Wildcard / Subdomains</th>
+              <th>Comment</th>
+              <th>Created</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="rulesTableBody">
+            <tr><td colspan="6" style="text-align:center; color:var(--text-muted)">Loading custom rules...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VIEW 5: SETTINGS & UPSTREAMS -->
+    <div id="view-settings" class="view-container">
+      <div class="panel">
+        <div class="panel-title">Upstream DNS Resolvers</div>
+        <div class="panel-sub">Forward permitted queries to secure DNS-over-HTTPS (DoH), DNS-over-TLS (DoT) or standard UDP/TCP servers.</div>
+        
+        <div class="form-row">
+          <label>Primary Upstream Servers (one per line)</label>
+          <textarea id="settingUpstreams" rows="3" placeholder="https://cloudflare-dns.com/dns-query&#10;https://dns.quad9.net/dns-query"></textarea>
+          <div class="form-help">Supported formats: https://.../dns-query (DoH), tls://dns.quad9.net (DoT), 1.1.1.1:53 (UDP), tcp://1.1.1.1</div>
+        </div>
+
+        <div class="form-row">
+          <label>Fallback Servers (used only if all primaries fail)</label>
+          <input type="text" id="settingFallbacks" placeholder="1.1.1.1, 9.9.9.9">
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1rem;">
+          <div class="form-row">
+            <label>Upstream Strategy</label>
+            <select id="settingUpstreamMode">
+              <option value="failover">Failover (in order)</option>
+              <option value="parallel">Parallel (fastest response wins)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Upstream Timeout (ms)</label>
+            <input type="number" id="settingTimeout" min="200" max="10000" step="100">
+          </div>
+        </div>
+
+        <!-- Upstream latency tester -->
+        <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--card-border);">
+          <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted)">Test Upstream Speed</label>
+          <div style="display:flex; gap:0.5rem; margin-top:0.4rem;">
+            <input type="text" id="testUpstreamInput" placeholder="https://cloudflare-dns.com/dns-query" style="flex:1;">
+            <button class="btn btn-secondary btn-sm" onclick="testUpstreamLatency()">Ping Upstream</button>
+          </div>
+          <div id="testUpstreamResult" style="font-size:0.8rem; margin-top:0.4rem;"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">DNS Engine & Cache Settings</div>
+        <div class="panel-sub">In-memory caching and response behavior for sinkholed domains.</div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1rem;">
+          <div class="form-row">
+            <label>Block Mode</label>
+            <select id="settingBlockMode">
+              <option value="null_ip">Null IP (0.0.0.0 / ::) - Recommended</option>
+              <option value="nxdomain">NXDOMAIN (Empty authoritative reply)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Blocked Response TTL (seconds)</label>
+            <input type="number" id="settingBlockedTTL" min="1" max="86400">
+          </div>
+          <div class="form-row">
+            <label>In-Memory Cache Size (Entries)</label>
+            <input type="number" id="settingCacheSize" min="1000" max="1000000">
+          </div>
+        </div>
+
+        <div style="display:flex; gap:1rem; margin-top:1rem; align-items:center;">
+          <button class="btn btn-primary" onclick="saveSettings()">Save DNS Settings</button>
+          <button class="btn btn-secondary" onclick="flushCache()">Flush In-Memory Cache</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 6: NETWORK ADAPTERS & ROUTER SETUP -->
+    <div id="view-network" class="view-container">
+      <div class="panel">
+        <div class="panel-title">Windows 11 Adapter Setup (1-Click Local Testing)</div>
+        <div class="panel-sub">Direct your current Windows machine to use this local sinkhole (127.0.0.1) as its DNS server.</div>
+        <div class="table-container" style="margin-top:1rem; margin-bottom:1rem;">
+          <table>
+            <thead>
+              <tr>
+                <th>Adapter Name</th>
+                <th>Interface Type</th>
+                <th>Status</th>
+                <th>Current DNS Server(s)</th>
+                <th>Sinkhole Active?</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="adapterTableBody">
+              <tr><td colspan="6" style="text-align:center; color:var(--text-muted)">Scanning network interfaces...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Whole-Home Network Router Configuration</div>
+        <div class="panel-sub">To protect every device on your Wi-Fi/Ethernet (phones, smart TVs, laptops, tablets), configure your router's DHCP DNS.</div>
+        
+        <div style="display:flex; flex-direction:column; gap:1rem; font-size:0.9rem; line-height:1.6;">
+          <p>
+            This Windows 11 host is currently reachable on your local LAN at:
+            <span id="lanIpAddresses" style="font-weight:700; color:var(--accent-cyan); font-family:monospace;">Scanning...</span>
+          </p>
+
+          <ol style="padding-left:1.5rem; display:flex; flex-direction:column; gap:0.5rem;">
+            <li>Log in to your home router admin portal (typically <code class="code-box">http://192.168.1.1</code> or <code class="code-box">http://192.168.0.1</code>).</li>
+            <li>Navigate to <strong>Network / LAN / DHCP Server Settings</strong>.</li>
+            <li>Locate the <strong>Primary DNS Server</strong> field and set it to this Windows PC's static LAN IP address (shown above).</li>
+            <li>Leave Secondary DNS blank (or point it to this machine's IP as well) so devices don't bypass your sinkhole.</li>
+            <li>Ensure the Windows Firewall allows incoming UDP & TCP on Port 53 (run <code class="code-box">scripts/Setup-Firewall.ps1</code>).</li>
+            <li>Save router settings. Connected devices will now automatically filter ads through this Windows 11 sinkhole!</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="toast" class="toast">Action completed</div>
+
+  <script>
+    // State
+    let currentView = 'overview';
+    let sseSource = null;
+    let logPaused = false;
+    let rawQueryLogs = [];
+    let serverConfig = null;
+
+    const views = {
+      overview: { title: 'Overview & Telemetry', desc: 'Real-time Windows DNS sinkhole metrics and filtering activity.' },
+      querylog: { title: 'Live Query Log', desc: 'Real-time log of DNS queries with domain, client IP, latency, and status.' },
+      blocklists: { title: 'Blocklist Subscriptions', desc: 'Manage remote ad/tracker blocklists and update schedules.' },
+      rules: { title: 'Custom Whitelist & Blacklist', desc: 'Override domains manually with wildcard and subdomain support.' },
+      settings: { title: 'DNS & Upstream Settings', desc: 'Configure upstream DNS-over-HTTPS/UDP resolvers and caching.' },
+      network: { title: 'Adapters & Home Router Guide', desc: 'Configure local Windows 11 adapters and home router DHCP distribution.' }
+    };
+
+    function showToast(msg, isError = false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.borderColor = isError ? 'var(--accent-red)' : 'var(--accent-blue)';
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    function switchView(viewName) {
+      currentView = viewName;
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view-container').forEach(c => c.classList.remove('active'));
+
+      const activeBtn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.textContent.toLowerCase().includes(viewName.slice(0, 4)));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const target = document.getElementById(`view-${viewName}`);
+      if (target) target.classList.add('active');
+
+      document.getElementById('pageTitle').textContent = views[viewName].title;
+      document.getElementById('pageDesc').textContent = views[viewName].desc;
+
+      refreshCurrentView();
+    }
+
+    function refreshCurrentView() {
+      fetchStatus();
+      if (currentView === 'overview') fetchStats();
+      if (currentView === 'querylog') fetchQueryLog();
+      if (currentView === 'blocklists') fetchBlocklists();
+      if (currentView === 'rules') fetchRules();
+      if (currentView === 'settings') fetchSettings();
+      if (currentView === 'network') fetchAdapters();
+    }
+
+    // API Calls
+    async function api(path, options = {}) {
+      options.headers = {
+        'Content-Type': 'application/json',
+        'X-Sinkhole': '1',
+        ...(options.headers || {})
+      };
+      const res = await fetch(path, options);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    // Status & SSE
+    async function fetchStatus() {
+      try {
+        const data = await api('/api/status');
+        document.getElementById('serverVersion').textContent = data.version;
+        document.getElementById('activeRulesCount').textContent = (data.lists.list_rules || 0).toLocaleString();
+        document.getElementById('protectionToggle').checked = data.protection;
+        
+        if (data.lan_addresses && data.lan_addresses.length > 0) {
+          document.getElementById('lanIpAddresses').textContent = data.lan_addresses.join(', ');
+        } else {
+          document.getElementById('lanIpAddresses').textContent = '127.0.0.1 (Loopback)';
+        }
+      } catch (err) {
+        console.error('Status fetch failed', err);
+      }
+    }
+
+    async function toggleProtection(enabled) {
+      try {
+        await api('/api/protection', { method: 'POST', body: JSON.stringify({ enabled }) });
+        showToast(`Protection ${enabled ? 'Enabled' : 'Disabled'}`);
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    // Overview Stats
+    async function fetchStats() {
+      try {
+        const s = await api('/api/stats?top=8');
+        document.getElementById('statTotal').textContent = s.total.toLocaleString();
+        document.getElementById('statBlocked').textContent = s.blocked.toLocaleString();
+        document.getElementById('statBlockedPct').textContent = `${(s.blocked_pct || 0).toFixed(1)}% sinkholed`;
+        document.getElementById('statCached').textContent = s.cached.toLocaleString();
+        document.getElementById('statLatency').textContent = `${Math.round(s.avg_upstream_ms || 0)} ms`;
+        
+        const mins = Math.floor((s.uptime_sec || 0) / 60);
+        document.getElementById('statUptime').textContent = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+
+        // Render Histogram
+        renderHistogram(s.hours || []);
+
+        // Render Top Permitted
+        renderRankList('rankTopDomains', s.top_domains || []);
+        renderRankList('rankTopBlocked', s.top_blocked || [], true);
+        renderRankList('rankTopClients', s.top_clients || []);
+      } catch (err) {
+        console.error('Stats error', err);
+      }
+    }
+
+    function renderHistogram(hours) {
+      const container = document.getElementById('histogramBars');
+      if (!hours || hours.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;margin:auto">No query history yet</div>';
+        return;
+      }
+      let maxTotal = 1;
+      hours.forEach(h => { if (h.total > maxTotal) maxTotal = h.total; });
+
+      container.innerHTML = hours.map(h => {
+        const totalPct = Math.max((h.total / maxTotal) * 100, 2);
+        const blockedPct = h.total > 0 ? (h.blocked / h.total) * 100 : 0;
+        const d = new Date(h.ts * 1000);
+        const timeStr = `${d.getHours()}:00`;
+        const tip = `${timeStr} - ${h.total} queries (${h.blocked} blocked)`;
+
+        return `
+          <div class="bar-col" data-tooltip="${tip}">
+            <div class="bar-fill" style="height:${totalPct}%">
+              <div class="bar-fill-blocked" style="height:${blockedPct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderRankList(elemId, items, isBlocked = false) {
+      const el = document.getElementById(elemId);
+      if (!items || items.length === 0) {
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem">No data recorded yet.</div>';
+        return;
+      }
+      el.innerHTML = items.map(item => `
+        <div class="rank-item">
+          <span class="rank-key" title="${item.key}">${item.key}</span>
+          <span class="rank-val" style="${isBlocked ? 'color:var(--accent-red)' : ''}">${item.count.toLocaleString()}</span>
+        </div>
+      `).join('');
+    }
+
+    // Query Log
+    async function fetchQueryLog() {
+      try {
+        const rows = await api('/api/querylog?limit=50');
+        rawQueryLogs = rows || [];
+        renderQueryLogTable(rawQueryLogs);
+      } catch (err) {
+        console.error('Log fetch error', err);
+      }
+    }
+
+    function filterQueryLog() {
+      const q = document.getElementById('logSearch').value.toLowerCase().trim();
+      const status = document.getElementById('logStatusFilter').value;
+      const filtered = rawQueryLogs.filter(row => {
+        const matchQ = !q || row.domain.toLowerCase().includes(q) || row.client.toLowerCase().includes(q);
+        const matchStatus = !status || (status === 'cached' ? row.cached : row.status === status);
+        return matchQ && matchStatus;
+      });
+      renderQueryLogTable(filtered);
+    }
+
+    function renderQueryLogTable(rows) {
+      const tbody = document.getElementById('queryLogBody');
+      if (!rows || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--text-muted)">No matching DNS queries.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const d = new Date(r.ts);
+        const timeStr = d.toLocaleTimeString();
+        let badgeClass = r.status;
+        let badgeLabel = r.status;
+        if (r.cached) { badgeClass = 'cached'; badgeLabel = 'cached'; }
+
+        const latency = (r.latency_us / 1000).toFixed(1) + 'ms';
+        return `
+          <tr>
+            <td style="color:var(--text-muted); font-size:0.75rem">${timeStr}</td>
+            <td><code style="color:var(--accent-cyan)">${r.client}</code></td>
+            <td><span style="font-weight:600;font-size:0.75rem;">${r.qtype}</span></td>
+            <td><strong>${r.domain}</strong></td>
+            <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+            <td style="color:var(--text-muted);font-size:0.75rem">${r.reason || (r.upstream ? 'Forwarded: ' + r.upstream : 'Allowed')}</td>
+            <td style="font-family:monospace">${latency}</td>
+            <td style="color:var(--text-muted);font-size:0.75rem">${r.answer || '-'}</td>
+            <td>
+              ${r.status === 'blocked' ? 
+                `<button class="btn btn-secondary btn-sm" onclick="quickRule('${r.domain}', 'allow')">Whitelist</button>` :
+                `<button class="btn btn-danger btn-sm" onclick="quickRule('${r.domain}', 'block')">Block</button>`
+              }
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function toggleLogPause() {
+      logPaused = !logPaused;
+      document.getElementById('pauseLogBtn').textContent = logPaused ? 'Resume Stream' : 'Pause Stream';
+    }
+
+    async function clearQueryLog() {
+      if (!confirm('Clear all query history in the database?')) return;
+      try {
+        await api('/api/querylog', { method: 'DELETE' });
+        rawQueryLogs = [];
+        renderQueryLogTable([]);
+        showToast('Query log cleared');
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function quickRule(domain, action) {
+      try {
+        await api('/api/rules', {
+          method: 'POST',
+          body: JSON.stringify({ domain, action, subdomains: true, comment: 'Added from Query Log' })
+        });
+        showToast(`Domain ${domain} added to ${action}list`);
+        fetchStats();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    // Blocklists
+    async function fetchBlocklists() {
+      try {
+        const data = await api('/api/blocklists');
+        const lists = data.lists || [];
+        document.getElementById('blocklistCount').textContent = lists.length;
+        const tbody = document.getElementById('blocklistTableBody');
+        if (lists.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted)">No blocklists configured.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = lists.map(l => {
+          const updated = l.last_updated ? new Date(l.last_updated).toLocaleString() : 'Never';
+          return `
+            <tr>
+              <td>
+                <input type="checkbox" ${l.enabled ? 'checked' : ''} onchange="toggleBlocklist(${l.id}, this.checked)" style="display:inline; width:16px; height:16px; cursor:pointer;">
+              </td>
+              <td><strong>${l.name}</strong></td>
+              <td><span style="font-family:monospace; font-size:0.75rem; color:var(--text-muted)">${l.url}</span></td>
+              <td><span style="color:var(--accent-blue);font-weight:600">${(l.rule_count || 0).toLocaleString()}</span></td>
+              <td style="color:var(--text-muted);font-size:0.75rem">
+                ${updated}
+                ${l.last_error ? `<div style="color:var(--accent-red);font-size:0.7rem">${l.last_error}</div>` : ''}
+              </td>
+              <td style="display:flex; gap:0.4rem;">
+                <button class="btn btn-secondary btn-sm" onclick="updateBlocklist(${l.id})">Update</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteBlocklist(${l.id})">Delete</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Blocklists error', err);
+      }
+    }
+
+    async function addBlocklist(e) {
+      e.preventDefault();
+      const name = document.getElementById('newListName').value;
+      const url = document.getElementById('newListUrl').value;
+      try {
+        await api('/api/blocklists', { method: 'POST', body: JSON.stringify({ name, url }) });
+        document.getElementById('newListName').value = '';
+        document.getElementById('newListUrl').value = '';
+        showToast('Blocklist added. Downloading rules in background...');
+        fetchBlocklists();
+        setTimeout(fetchBlocklists, 3000);
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function toggleBlocklist(id, enabled) {
+      try {
+        await api(`/api/blocklists/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) });
+        showToast(`Blocklist ${enabled ? 'enabled' : 'disabled'}`);
+        fetchBlocklists();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function updateBlocklist(id) {
+      try {
+        await api(`/api/blocklists/${id}/update`, { method: 'POST' });
+        showToast('Update started');
+        setTimeout(fetchBlocklists, 2500);
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function updateAllBlocklists() {
+      try {
+        await api('/api/blocklists/update', { method: 'POST' });
+        showToast('Updating all blocklists in background...');
+        setTimeout(fetchBlocklists, 3000);
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function deleteBlocklist(id) {
+      if (!confirm('Remove this blocklist subscription?')) return;
+      try {
+        await api(`/api/blocklists/${id}`, { method: 'DELETE' });
+        showToast('Blocklist deleted');
+        fetchBlocklists();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    // Custom Rules
+    async function fetchRules() {
+      try {
+        const rules = await api('/api/rules');
+        const tbody = document.getElementById('rulesTableBody');
+        if (!rules || rules.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted)">No custom rules configured yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = rules.map(r => `
+          <tr>
+            <td><span class="badge ${r.action === 'block' ? 'blocked' : 'allowed'}">${r.action}</span></td>
+            <td><strong>${r.domain}</strong></td>
+            <td>${r.subdomains ? '<span style="color:var(--accent-blue)">Yes (*.' + r.domain + ')</span>' : 'Exact match only'}</td>
+            <td style="color:var(--text-muted)">${r.comment || '-'}</td>
+            <td style="color:var(--text-muted);font-size:0.75rem">${new Date(r.created_at).toLocaleDateString()}</td>
+            <td><button class="btn btn-danger btn-sm" onclick="deleteRule(${r.id})">Delete</button></td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Rules error', err);
+      }
+    }
+
+    async function addCustomRule(e) {
+      e.preventDefault();
+      const domain = document.getElementById('ruleDomain').value;
+      const action = document.getElementById('ruleAction').value;
+      const subdomains = document.getElementById('ruleSubdomains').checked;
+      const comment = document.getElementById('ruleComment').value;
+      try {
+        await api('/api/rules', { method: 'POST', body: JSON.stringify({ domain, action, subdomains, comment }) });
+        document.getElementById('ruleDomain').value = '';
+        document.getElementById('ruleComment').value = '';
+        showToast(`Rule for ${domain} saved`);
+        fetchRules();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function deleteRule(id) {
+      try {
+        await api(`/api/rules/${id}`, { method: 'DELETE' });
+        showToast('Rule removed');
+        fetchRules();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function testDomainMatch() {
+      const d = document.getElementById('testDomainInput').value.trim();
+      const resEl = document.getElementById('testDomainResult');
+      if (!d) return;
+      try {
+        const out = await api(`/api/check?domain=${encodeURIComponent(d)}`);
+        resEl.style.display = 'block';
+        if (out.result.blocked) {
+          resEl.innerHTML = `<span style="color:var(--accent-red);font-weight:700">❌ BLOCKED</span> by <strong>${out.result.list_name || 'Blocklist'}</strong> (Rule: <code>${out.result.rule}</code>)`;
+        } else {
+          resEl.innerHTML = `<span style="color:var(--accent-green);font-weight:700">✅ PERMITTED</span> ${out.result.reason ? '(' + out.result.reason + ')' : '(Not in any active blocklist)'}`;
+        }
+      } catch (err) {
+        resEl.style.display = 'block';
+        resEl.innerHTML = `<span style="color:var(--accent-amber)">Error: ${err.message}</span>`;
+      }
+    }
+
+    // Settings
+    async function fetchSettings() {
+      try {
+        serverConfig = await api('/api/settings');
+        document.getElementById('settingUpstreams').value = (serverConfig.upstreams || []).join('\n');
+        document.getElementById('settingFallbacks').value = (serverConfig.fallbacks || []).join(', ');
+        document.getElementById('settingUpstreamMode').value = serverConfig.upstream_mode || 'failover';
+        document.getElementById('settingTimeout').value = serverConfig.upstream_timeout_ms || 2500;
+        document.getElementById('settingBlockMode').value = serverConfig.block_mode || 'null_ip';
+        document.getElementById('settingBlockedTTL').value = serverConfig.blocked_ttl || 10;
+        document.getElementById('settingCacheSize').value = serverConfig.cache_size || 20000;
+      } catch (err) {
+        console.error('Settings error', err);
+      }
+    }
+
+    async function saveSettings() {
+      if (!serverConfig) return;
+      const upstreams = document.getElementById('settingUpstreams').value.split('\n').map(s => s.trim()).filter(Boolean);
+      const fallbacks = document.getElementById('settingFallbacks').value.split(',').map(s => s.trim()).filter(Boolean);
+      serverConfig.upstreams = upstreams;
+      serverConfig.fallbacks = fallbacks;
+      serverConfig.upstream_mode = document.getElementById('settingUpstreamMode').value;
+      serverConfig.upstream_timeout_ms = parseInt(document.getElementById('settingTimeout').value, 10);
+      serverConfig.block_mode = document.getElementById('settingBlockMode').value;
+      serverConfig.blocked_ttl = parseInt(document.getElementById('settingBlockedTTL').value, 10);
+      serverConfig.cache_size = parseInt(document.getElementById('settingCacheSize').value, 10);
+
+      try {
+        await api('/api/settings', { method: 'PUT', body: JSON.stringify(serverConfig) });
+        showToast('Settings saved successfully');
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function flushCache() {
+      try {
+        await api('/api/cache/flush', { method: 'POST' });
+        showToast('In-memory DNS cache cleared');
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function testUpstreamLatency() {
+      const u = document.getElementById('testUpstreamInput').value.trim();
+      const resEl = document.getElementById('testUpstreamResult');
+      if (!u) return;
+      resEl.textContent = 'Querying upstream...';
+      try {
+        const out = await api('/api/upstreams/test', { method: 'POST', body: JSON.stringify({ upstream: u }) });
+        if (out.ok) {
+          resEl.innerHTML = `<span style="color:var(--accent-green);font-weight:600">Reachable: ${out.latency_ms.toFixed(1)} ms</span> (Resolved example.com to ${out.answer})`;
+        } else {
+          resEl.innerHTML = `<span style="color:var(--accent-red)">Failed: ${out.error}</span>`;
+        }
+      } catch (err) {
+        resEl.innerHTML = `<span style="color:var(--accent-red)">Error: ${err.message}</span>`;
+      }
+    }
+
+    // Network & Adapters
+    async function fetchAdapters() {
+      const tbody = document.getElementById('adapterTableBody');
+      try {
+        const list = await api('/api/system/adapters');
+        if (!list || list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted)">No active network adapters found.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = list.map(a => `
+          <tr>
+            <td><strong>${a.alias}</strong></td>
+            <td style="color:var(--text-muted);font-size:0.75rem">${a.description}</td>
+            <td><span class="badge ${a.status === 'Up' ? 'allowed' : 'error'}">${a.status}</span></td>
+            <td><code style="font-size:0.8rem">${(a.ipv4_dns || []).join(', ') || 'DHCP'}</code></td>
+            <td>
+              ${a.uses_sinkhole ? 
+                '<span class="badge allowed">Active (127.0.0.1)</span>' : 
+                '<span style="color:var(--text-muted);font-size:0.8rem">No</span>'
+              }
+            </td>
+            <td>
+              ${a.uses_sinkhole ?
+                `<button class="btn btn-secondary btn-sm" onclick="restoreAdapter(${a.index})">Restore Original DNS</button>` :
+                `<button class="btn btn-primary btn-sm" onclick="pointAdapterToSinkhole(${a.index})">Point to Sinkhole</button>`
+              }
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--accent-amber)">Adapter query requires elevated privileges or service mode: ${err.message}</td></tr>`;
+      }
+    }
+
+    async function pointAdapterToSinkhole(index) {
+      try {
+        await api(`/api/system/adapters/${index}/sinkhole`, { method: 'POST' });
+        showToast('Adapter DNS updated to 127.0.0.1');
+        fetchAdapters();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function restoreAdapter(index) {
+      try {
+        await api(`/api/system/adapters/${index}/restore`, { method: 'POST' });
+        showToast('Adapter DNS restored');
+        fetchAdapters();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    // SSE Setup
+    function setupSSE() {
+      if (sseSource) sseSource.close();
+      sseSource = new EventSource('/api/events');
+      sseSource.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.counters && currentView === 'overview') {
+            document.getElementById('statTotal').textContent = data.counters.total.toLocaleString();
+            document.getElementById('statBlocked').textContent = data.counters.blocked.toLocaleString();
+            document.getElementById('statBlockedPct').textContent = `${(data.counters.blocked_pct || 0).toFixed(1)}% sinkholed`;
+            document.getElementById('statCached').textContent = data.counters.cached.toLocaleString();
+            document.getElementById('statLatency').textContent = `${Math.round(data.counters.avg_upstream_ms || 0)} ms`;
+          }
+          if (data.queries && data.queries.length > 0 && !logPaused) {
+            rawQueryLogs = [...data.queries.reverse(), ...rawQueryLogs].slice(0, 200);
+            if (currentView === 'querylog') {
+              filterQueryLog();
+            }
+          }
+        } catch (err) {
+          console.error('SSE parse error', err);
+        }
+      };
+      sseSource.onerror = () => {
+        // Retry handled automatically by EventSource
+      };
+    }
+
+    // Init
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchStatus();
+      fetchStats();
+      setupSSE();
+    });
+  </script>
+</body>
+</html>
