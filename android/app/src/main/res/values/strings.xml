@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Sinkhole</string>
+    <string name="configure_server">Configure Server</string>
+    <string name="server_url">Server URL</string>
+    <string name="connect">Connect</string>
+    <string name="cancel">Cancel</string>
+    <string name="private_dns">Private DNS</string>
+</resources>

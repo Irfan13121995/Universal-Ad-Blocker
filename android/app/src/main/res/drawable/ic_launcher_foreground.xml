@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Blue gradient shield icon with 'S' lettermark -->
+    <path
+        android:fillColor="#0A84FF"
+        android:pathData="M54,24 L78,34 L78,56 C78,71 68,84 54,89 C40,84 30,71 30,56 L30,34 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M51,46 C47,46 44,48 44,51 C44,56 59,54 59,63 C59,69 53,72 47,70 L48,66 C52,68 55,66 55,63 C55,59 40,60 40,51 C40,45 46,42 52,42 L51,46 Z" />
+</vector>

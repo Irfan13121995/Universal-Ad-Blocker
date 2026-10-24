@@ -1,0 +1,10 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Sinkhole" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/apple_blue</item>
+        <item name="colorPrimaryVariant">@color/bg_base</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+        <item name="android:statusBarColor">@color/status_bar_color</item>
+        <item name="android:navigationBarColor">@color/status_bar_color</item>
+        <item name="android:windowBackground">@color/bg_base</item>
+    </style>
+</resources>

@@ -1,0 +1,9 @@
+<resources>
+    <color name="bg_base">#06090e</color>
+    <color name="apple_blue">#0A84FF</color>
+    <color name="apple_green">#30D158</color>
+    <color name="apple_red">#FF453A</color>
+    <color name="text_primary">#F5F5F7</color>
+    <color name="text_secondary">#98989D</color>
+    <color name="status_bar_color">#06090e</color>
+</resources>

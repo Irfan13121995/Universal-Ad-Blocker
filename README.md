@@ -16,7 +16,8 @@
 - **Zero-Buffering Video Passthrough:** High-speed raw TCP tunneling for media chunks (`*.googlevideo.com/videoplayback`) ensuring 4K/60fps and 8K HDR playback without buffering or CPU overhead.
 - **Loopback Isolation via Bootstrap Resolver:** Employs an independent bootstrap DNS client to resolve DoH upstream hostnames, avoiding resolution deadlocks when Windows points to `127.0.0.1`.
 - **Pure-Go Embedded SQLite:** Embedded SQLite storage (pure Go, zero CGO requirement) with WAL mode for query logging, settings, blocklist metadata, and custom rules.
-- **Embedded Web Dashboard:** Single-binary distribution with embedded HTML5/CSS3/JavaScript dashboard featuring real-time Server-Sent Events (SSE), 24h query charts, live query stream, blocklist manager, custom rule overrides, and network adapter controls.
+- **Embedded Web & Mobile Dashboard:** Single-binary distribution with embedded HTML5/CSS3/JavaScript dashboard featuring real-time Server-Sent Events (SSE), 24h query charts, live query stream, blocklist manager, custom rule overrides, and network adapter controls.
+- **Native Android Companion App (`/android`):** Native Android Studio project (Kotlin + WebKit + SwipeRefresh) with hardware haptics, remote LAN server switcher, and 1-click **Android Private DNS (DoT)** configuration intent to protect mobile devices on both Wi-Fi and Cellular networks.
 - **Automated PowerShell Tooling:** Includes automated scripts for Windows Defender Firewall configuration, service installation, and 1-click network adapter DNS toggling.
 
 ---
@@ -256,6 +257,22 @@ To protect all devices on your home network (iPhones, Android phones, smart TVs,
 4. **Verify Connected Devices:**
    - Reconnect Wi-Fi on your phone or tablet (or run `ipconfig /renew`).
    - The device will now route all DNS queries through your Windows 11 Sinkhole, and its queries will appear live in the Sinkhole Dashboard!
+
+---
+
+## Android Companion App
+
+A complete native Android Studio project is located in [`/android`](file:///c:/Users/irfan/.gemini/antigravity/scratch/Ad-Blocker/android):
+
+- **Features:** Native hardware haptics, pull-to-refresh (`SwipeRefreshLayout`), dark mode edge-to-edge UI, LAN server switcher, and offline asset fallback.
+- **1-Click Android Private DNS (DoT):** Opens Android system settings directly to `Settings > Network & internet > Private DNS` to protect mobile devices even when away from home Wi-Fi.
+- **Quick Build:**
+  ```powershell
+  cd android
+  .\gradlew.bat assembleDebug
+  ```
+  Generated APK is saved to: `android/app/build/outputs/apk/debug/app-debug.apk`.
+- Refer to [`android/README.md`](file:///c:/Users/irfan/.gemini/antigravity/scratch/Ad-Blocker/android/README.md) for full instructions and architecture details.
 
 ---
 

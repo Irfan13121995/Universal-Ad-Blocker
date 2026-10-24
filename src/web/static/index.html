@@ -2,12 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#06090e" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#06090e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
   <title>Sinkhole - Windows Network Ad & Tracker Filter</title>
   <style>
     /* -------------------------------------------------------------
-       APPLE DESIGN & FLUID INTERFACE TOKENS
-       WWDC Designing Fluid Interfaces & Design Engineering Principles
+       APPLE DESIGN & MOBILE-NATIVE INTERFACE TOKENS
+       WWDC Designing Fluid Interfaces, Emil Kowalski & Mobile-Native
        ------------------------------------------------------------- */
     :root {
       /* Typography & Font Sizing */
@@ -60,13 +66,17 @@
       --radius-pill: 9999px;
     }
 
-    /* Base Reset */
+    /* Base Reset & Mobile-Native Performance */
     *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+    }
+
+    html {
+      -webkit-tap-highlight-color: transparent; /* Kill touch tap highlight flash */
     }
 
     body {
@@ -82,8 +92,17 @@
       line-height: 1.45;
       letter-spacing: -0.006em;
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       overflow: hidden;
+      overscroll-behavior-y: none; /* Prevent pull-to-refresh hijacking */
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
+
+    button, a, input, select, textarea {
+      touch-action: manipulation; /* Eliminate 300ms tap delay */
     }
 
     /* Tabular numbers for counters, latency and timestamps */
@@ -92,7 +111,7 @@
     }
 
     /* -------------------------------------------------------------
-       1. TRANSLUCENT FLOATING SIDEBAR
+       1. SIDEBAR / DRAWER NAVIGATION
        ------------------------------------------------------------- */
     aside {
       width: 260px;
@@ -105,6 +124,7 @@
       flex-shrink: 0;
       z-index: 50;
       user-select: none;
+      transition: transform 300ms var(--spring-crit);
     }
 
     .brand {
@@ -181,12 +201,27 @@
       transition: transform 180ms var(--spring-crit);
     }
 
-    .nav-btn:hover {
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text-primary);
+    @media (hover: hover) and (pointer: fine) {
+      .nav-btn:hover {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-primary);
+      }
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: var(--glass-border-hover);
+      }
+      .btn-primary:hover {
+        background: linear-gradient(180deg, #1A8EFF 0%, #0A7AE5 100%);
+        box-shadow: 0 6px 16px var(--apple-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+      }
+      .stat-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--glass-border-hover);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 12px 32px rgba(0, 0, 0, 0.38);
+      }
     }
 
-    .nav-btn:active {
+    .nav-btn:active, .btn:active, .mobile-nav-item:active {
       transform: scale(0.97);
       transition: transform 80ms var(--spring-press);
     }
@@ -249,6 +284,7 @@
     main {
       flex: 1;
       height: 100vh;
+      height: 100dvh;
       overflow-y: auto;
       overflow-x: hidden;
       display: flex;
@@ -271,6 +307,29 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
     }
 
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .menu-toggle-btn {
+      display: none;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      padding: 0.5rem;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .menu-toggle-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
     .view-title {
       font-size: 1.45rem;
       font-weight: 700;
@@ -287,7 +346,22 @@
     .topbar-actions {
       display: flex;
       align-items: center;
-      gap: 1.25rem;
+      gap: 0.85rem;
+    }
+
+    .server-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.65rem;
+      background: rgba(10, 132, 255, 0.1);
+      border: 1px solid rgba(10, 132, 255, 0.25);
+      border-radius: var(--radius-pill);
+      color: var(--apple-blue);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
     }
 
     /* -------------------------------------------------------------
@@ -305,16 +379,6 @@
       border-radius: var(--radius-pill);
       box-shadow: inset 0 1px 0 var(--glass-highlight);
       transition: background 180ms, border-color 180ms;
-    }
-
-    .apple-switch:hover {
-      border-color: var(--glass-border-hover);
-      background: var(--glass-card-hover);
-    }
-
-    .apple-switch:active {
-      transform: scale(0.97);
-      transition: transform 80ms var(--spring-press);
     }
 
     .apple-switch-label {
@@ -413,12 +477,6 @@
       overflow: hidden;
       box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0, 0, 0, 0.28);
       transition: transform 240ms var(--spring-crit), border-color 240ms, box-shadow 240ms;
-    }
-
-    .stat-card:hover {
-      transform: translateY(-2px);
-      border-color: var(--glass-border-hover);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 12px 32px rgba(0, 0, 0, 0.38);
     }
 
     .stat-card::after {
@@ -563,7 +621,6 @@
       box-shadow: 0 0 8px var(--apple-red-glow);
     }
 
-    /* Floating Magnetic Scrubber Tooltip */
     #chartScrubberTooltip {
       position: absolute;
       top: 12px;
@@ -647,10 +704,6 @@
       transition: background 150ms;
     }
 
-    .rank-item:hover {
-      background: rgba(255, 255, 255, 0.05);
-    }
-
     .rank-key {
       overflow: hidden;
       text-overflow: ellipsis;
@@ -679,7 +732,7 @@
       -webkit-backdrop-filter: blur(20px) saturate(180%);
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-lg);
-      overflow: hidden;
+      overflow-x: auto;
       margin-bottom: 2rem;
       box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0, 0, 0, 0.28);
     }
@@ -700,6 +753,7 @@
       border-collapse: collapse;
       font-size: 0.84rem;
       text-align: left;
+      min-width: 600px;
     }
 
     th {
@@ -724,7 +778,6 @@
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: rgba(255, 255, 255, 0.03); }
 
-    /* Animated entry for new live streaming rows */
     .row-animate-enter {
       animation: rowFadeSlide 280ms var(--spring-crit) forwards;
     }
@@ -796,6 +849,7 @@
       display: flex;
       gap: 0.65rem;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     input[type="text"], input[type="number"], select, textarea {
@@ -837,20 +891,11 @@
       transition: transform 80ms var(--spring-press), background 160ms, border-color 160ms, box-shadow 160ms;
     }
 
-    .btn:active {
-      transform: scale(0.96);
-    }
-
     .btn-primary {
       background: linear-gradient(180deg, #0A84FF 0%, #0071E3 100%);
       color: #ffffff;
       border-color: rgba(255, 255, 255, 0.2);
       box-shadow: 0 4px 12px var(--apple-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-    }
-
-    .btn-primary:hover {
-      background: linear-gradient(180deg, #1A8EFF 0%, #0A7AE5 100%);
-      box-shadow: 0 6px 16px var(--apple-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.45);
     }
 
     .btn-secondary {
@@ -860,21 +905,10 @@
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: var(--glass-border-hover);
-    }
-
     .btn-danger {
       background: rgba(255, 69, 58, 0.15);
       color: var(--apple-red);
       border-color: rgba(255, 69, 58, 0.25);
-    }
-
-    .btn-danger:hover {
-      background: var(--apple-red);
-      color: #ffffff;
-      box-shadow: 0 4px 12px var(--apple-red-glow);
     }
 
     .btn-sm {
@@ -941,7 +975,7 @@
     }
 
     /* -------------------------------------------------------------
-       12. SONNER-GRADE FLUID TOAST SYSTEM
+       12. SONNER-GRADE FLUID TOAST & MODAL SYSTEM
        ------------------------------------------------------------- */
     .toast {
       position: fixed;
@@ -973,8 +1007,197 @@
       pointer-events: auto;
     }
 
+    /* Modal Backdrop & Sheet */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      animation: fadeIn 200ms ease;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: rgba(20, 30, 50, 0.95);
+      border: 1px solid var(--glass-border-hover);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 480px;
+      padding: 1.75rem;
+      position: relative;
+      animation: modalSlideUp 300ms var(--spring-crit);
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(20px) scale(0.96); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
     /* -------------------------------------------------------------
-       13. ACCESSIBILITY ENGINES
+       13. MOBILE BOTTOM NAVIGATION & RESPONSIVE LAYOUT
+       ------------------------------------------------------------- */
+    .mobile-bottom-bar {
+      display: none;
+    }
+
+    .drawer-scrim {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 80;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        flex-direction: column;
+      }
+
+      /* Transform desktop sidebar into slide-over drawer */
+      aside {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 280px;
+        z-index: 100;
+        transform: translateX(-100%);
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+      }
+
+      aside.drawer-open {
+        transform: translateX(0);
+      }
+
+      .drawer-scrim.drawer-open {
+        display: block;
+      }
+
+      .menu-toggle-btn {
+        display: flex;
+      }
+
+      .topbar {
+        padding: 0.85rem 1rem;
+      }
+
+      .view-title {
+        font-size: 1.15rem;
+      }
+
+      .view-desc {
+        display: none; /* Keep mobile topbar clean */
+      }
+
+      .view-container {
+        padding: 1rem 0.85rem 5rem 0.85rem;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+      }
+
+      .stat-card {
+        padding: 1rem 0.85rem;
+      }
+
+      .stat-value {
+        font-size: 1.75rem;
+      }
+
+      .chart-card {
+        padding: 1.15rem 1rem;
+      }
+
+      .chart-bars-wrap {
+        height: 120px;
+      }
+
+      .ranks-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+
+      /* Fix inputs auto-zooming on mobile */
+      input[type="text"], input[type="number"], select, textarea {
+        font-size: 16px !important;
+      }
+
+      /* Mobile Bottom Bar */
+      .mobile-bottom-bar {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: calc(60px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        background: rgba(11, 17, 29, 0.92);
+        backdrop-filter: blur(28px) saturate(200%);
+        -webkit-backdrop-filter: blur(28px) saturate(200%);
+        border-top: 1px solid var(--glass-border);
+        z-index: 90;
+        justify-content: space-around;
+        align-items: center;
+        user-select: none;
+      }
+
+      .mobile-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        color: var(--text-secondary);
+        font-size: 0.68rem;
+        font-weight: 500;
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 6px 12px;
+        border-radius: var(--radius-sm);
+        transition: color 150ms;
+        touch-action: manipulation;
+      }
+
+      .mobile-nav-item svg {
+        width: 22px;
+        height: 22px;
+        stroke-width: 2;
+      }
+
+      .mobile-nav-item.active {
+        color: var(--apple-blue);
+        font-weight: 600;
+      }
+
+      .toast {
+        bottom: calc(75px + env(safe-area-inset-bottom, 0px));
+        right: 1rem;
+        left: 1rem;
+        justify-content: center;
+      }
+    }
+
+    /* -------------------------------------------------------------
+       14. ACCESSIBILITY ENGINES
        ------------------------------------------------------------- */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -989,7 +1212,7 @@
     }
 
     @media (prefers-reduced-transparency: reduce) {
-      aside, .topbar, .stat-card, .chart-card, .table-container, .panel, .toast {
+      aside, .topbar, .stat-card, .chart-card, .table-container, .panel, .toast, .mobile-bottom-bar, .modal-card {
         background: #0f172a !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
@@ -999,13 +1222,16 @@
 </head>
 <body>
 
-  <!-- Translucent Floating Sidebar -->
-  <aside>
+  <!-- Drawer Scrim for Mobile -->
+  <div class="drawer-scrim" id="drawerScrim" onclick="closeDrawer()"></div>
+
+  <!-- Translucent Floating Sidebar / Drawer -->
+  <aside id="sideNavDrawer">
     <div class="brand">
       <div class="brand-logo">S</div>
       <div>
         <div class="brand-title">Sinkhole</div>
-        <div class="brand-sub">Windows 11 DNS</div>
+        <div class="brand-sub">Android & Windows</div>
       </div>
     </div>
     <nav>
@@ -1043,7 +1269,7 @@
       </button>
       <button class="nav-btn" onclick="switchView('network')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-        Adapters & Router
+        Adapters & Android
       </button>
     </nav>
     <div class="sidebar-footer">
@@ -1053,6 +1279,10 @@
       </div>
       <div>Engine Version: <span id="serverVersion" class="num-tnum">1.0.0</span></div>
       <div>Rules Active: <span id="activeRulesCount" class="num-tnum" style="color:var(--apple-teal);font-weight:600;">0</span></div>
+      <button class="btn btn-secondary btn-sm" onclick="openServerModal()" style="margin-top:0.4rem; justify-content:center;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        Server: <span id="currentServerLabel" style="max-width:110px; overflow:hidden; text-overflow:ellipsis;">127.0.0.1:3002</span>
+      </button>
     </div>
   </aside>
 
@@ -1061,23 +1291,33 @@
 
     <!-- Topbar (Common) -->
     <div class="topbar">
-      <div>
-        <div class="view-title" id="pageTitle">Overview & Telemetry</div>
-        <div class="view-desc" id="pageDesc">Real-time Windows DNS sinkhole metrics and filtering activity.</div>
+      <div class="topbar-left">
+        <button class="menu-toggle-btn" onclick="toggleDrawer()" title="Open Navigation Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div>
+          <div class="view-title" id="pageTitle">Overview & Telemetry</div>
+          <div class="view-desc" id="pageDesc">Real-time Windows DNS sinkhole metrics and filtering activity.</div>
+        </div>
       </div>
       <div class="topbar-actions">
+        <!-- Server chip for mobile -->
+        <div class="server-pill" onclick="openServerModal()" title="Change Sinkhole Server Target">
+          <span style="width:6px; height:6px; border-radius:50%; background:var(--apple-green);"></span>
+          <span id="topbarServerIp">3002</span>
+        </div>
+
         <!-- Apple Spring Switch -->
         <label class="apple-switch" title="Toggle global sinkhole protection">
           <input type="checkbox" id="protectionToggle" onchange="toggleProtection(this.checked)">
           <div class="apple-switch-track">
             <div class="apple-switch-thumb"></div>
           </div>
-          <span class="apple-switch-label">Sinkhole Protection</span>
+          <span class="apple-switch-label" id="protectionLabel">Shield</span>
         </label>
 
-        <button class="btn btn-secondary btn-sm" onclick="refreshCurrentView()">
+        <button class="btn btn-secondary btn-sm" onclick="refreshCurrentView()" style="padding:0.45rem;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v9h-9"/></svg>
-          Refresh
         </button>
       </div>
     </div>
@@ -1086,9 +1326,9 @@
     <div id="view-overview" class="view-container active">
       <div class="stats-grid">
         <div class="stat-card blue">
-          <div class="stat-title">Total Queries (Today)</div>
+          <div class="stat-title">Total Queries</div>
           <div class="stat-value num-tnum" id="statTotal">0</div>
-          <div class="stat-sub">Across all local clients</div>
+          <div class="stat-sub">Across all clients</div>
         </div>
         <div class="stat-card red">
           <div class="stat-title">Queries Blocked</div>
@@ -1101,14 +1341,14 @@
           <div class="stat-sub">0ms local response</div>
         </div>
         <div class="stat-card amber">
-          <div class="stat-title">Avg Upstream Latency</div>
+          <div class="stat-title">Avg Latency</div>
           <div class="stat-value num-tnum" id="statLatency">0 ms</div>
           <div class="stat-sub">Via secure DoH/UDP</div>
         </div>
         <div class="stat-card purple">
           <div class="stat-title">Uptime</div>
           <div class="stat-value num-tnum" id="statUptime">0m</div>
-          <div class="stat-sub">Windows Service</div>
+          <div class="stat-sub">Engine Active</div>
         </div>
       </div>
 
@@ -1117,8 +1357,8 @@
         <div class="chart-header">
           <div class="chart-title">24-Hour Query Volume & Block Rate</div>
           <div class="chart-legend">
-            <div class="legend-item"><span class="legend-box total"></span> Total Queries</div>
-            <div class="legend-item"><span class="legend-box blocked"></span> Blocked Queries</div>
+            <div class="legend-item"><span class="legend-box total"></span> Total</div>
+            <div class="legend-item"><span class="legend-box blocked"></span> Blocked</div>
           </div>
         </div>
         <div class="chart-bars-wrap" id="chartBarsWrap">
@@ -1126,8 +1366,8 @@
           <div id="chartScrubberTooltip">Hover over bar to inspect</div>
         </div>
         <div class="chart-labels">
-          <span>24 hours ago</span>
-          <span>12 hours ago</span>
+          <span>24h ago</span>
+          <span>12h ago</span>
           <span>Now</span>
         </div>
       </div>
@@ -1216,7 +1456,7 @@
           </div>
           <button class="btn btn-secondary btn-sm" onclick="updateAllBlocklists()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v9h-9"/></svg>
-            Update All Lists Now
+            Update All Lists
           </button>
         </div>
         <table>
@@ -1364,18 +1604,51 @@
           </div>
         </div>
 
-        <div style="display:flex; gap:1rem; margin-top:1.25rem; align-items:center;">
+        <div style="display:flex; gap:1rem; margin-top:1.25rem; align-items:center; flex-wrap:wrap;">
           <button class="btn btn-primary" onclick="saveSettings()">Save DNS Settings</button>
-          <button class="btn btn-secondary" onclick="flushCache()">Flush In-Memory Cache</button>
+          <button class="btn btn-secondary" onclick="flushCache()">Flush Cache</button>
         </div>
       </div>
     </div>
 
-    <!-- VIEW 6: NETWORK ADAPTERS & ROUTER SETUP -->
+    <!-- VIEW 6: NETWORK ADAPTERS, ROUTER & ANDROID -->
     <div id="view-network" class="view-container">
+      
+      <!-- Android Private DNS Card -->
+      <div class="panel" style="border-color: rgba(10, 132, 255, 0.35); background: linear-gradient(180deg, rgba(10, 132, 255, 0.08) 0%, rgba(17, 25, 42, 0.6) 100%);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+          <div>
+            <div class="panel-title" style="color:var(--apple-blue); display:flex; align-items:center; gap:0.5rem;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+              Android Mobile Protection (Private DNS / DoT)
+            </div>
+            <div class="panel-sub" style="margin-bottom:0.75rem;">
+              Protect your Android phone anywhere on mobile LTE and Wi-Fi without running background battery-draining apps.
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openAndroidPrivateDNS()">
+            1-Click Android Settings
+          </button>
+        </div>
+
+        <div style="font-size:0.85rem; line-height:1.6; color:var(--text-secondary);">
+          <p style="margin-bottom:0.5rem;">
+            1. Open Android <strong>Settings &gt; Network &amp; internet &gt; Private DNS</strong>.
+          </p>
+          <p style="margin-bottom:0.5rem;">
+            2. Select <strong>Private DNS provider hostname</strong>.
+          </p>
+          <p>
+            3. Point your router's DHCP or Android DNS to your Sinkhole host IP: 
+            <span id="androidLanIpDisplay" class="code-box" style="display:inline-block; padding:0.2rem 0.5rem; margin-left:0.25rem;">127.0.0.1</span>
+            <button class="btn btn-secondary btn-sm" style="margin-left:0.5rem;" onclick="copyLanIp()">Copy IP</button>
+          </p>
+        </div>
+      </div>
+
       <div class="panel">
         <div class="panel-title">Windows 11 Adapter Setup (1-Click Local Testing)</div>
-        <div class="panel-sub">Direct your current Windows machine to use this local sinkhole (127.0.0.1) as its DNS server.</div>
+        <div class="panel-sub">Direct your current Windows machine to use this local sinkhole as its DNS server.</div>
         <div class="table-container" style="margin-top:1rem; margin-bottom:1rem;">
           <table>
             <thead>
@@ -1397,21 +1670,20 @@
 
       <div class="panel">
         <div class="panel-title">Whole-Home Network Router Configuration</div>
-        <div class="panel-sub">To protect every device on your Wi-Fi/Ethernet (phones, smart TVs, laptops, tablets), configure your router's DHCP DNS.</div>
+        <div class="panel-sub">To protect every phone, smart TV, and laptop on your Wi-Fi, configure your router's DHCP DNS.</div>
         
         <div style="display:flex; flex-direction:column; gap:1rem; font-size:0.9rem; line-height:1.6;">
           <p>
-            This Windows 11 host is currently reachable on your local LAN at:
+            This Sinkhole host is reachable on your local LAN at:
             <span id="lanIpAddresses" style="font-weight:700; color:var(--apple-teal); font-family:var(--font-mono);">Scanning...</span>
           </p>
 
           <ol style="padding-left:1.5rem; display:flex; flex-direction:column; gap:0.6rem;">
-            <li>Log in to your home router admin portal (typically <code class="code-box">http://192.168.1.1</code> or <code class="code-box">http://192.168.0.1</code>).</li>
+            <li>Log in to your home router admin portal (typically <code class="code-box">http://192.168.1.1</code>).</li>
             <li>Navigate to <strong>Network / LAN / DHCP Server Settings</strong>.</li>
-            <li>Locate the <strong>Primary DNS Server</strong> field and set it to this Windows PC's static LAN IP address (shown above).</li>
-            <li>Leave Secondary DNS blank (or point it to this machine's IP as well) so devices don't bypass your sinkhole.</li>
-            <li>Ensure the Windows Firewall allows incoming UDP & TCP on Port 53 (run <code class="code-box">scripts/Setup-Firewall.ps1</code>).</li>
-            <li>Save router settings. Connected devices will now automatically filter ads through this Windows 11 sinkhole!</li>
+            <li>Locate the <strong>Primary DNS Server</strong> field and set it to this host's LAN IP address.</li>
+            <li>Leave Secondary DNS blank so devices don't bypass filtering.</li>
+            <li>Save router settings. Connected phones will now automatically filter ads through this sinkhole!</li>
           </ol>
         </div>
       </div>
@@ -1421,7 +1693,7 @@
     <div id="view-youtube" class="view-container">
       <div class="panel">
         <div class="panel-title">YouTube Shield & Video Ad Defusal</div>
-        <div class="panel-sub">Deep payload interception that strips video prerolls, midrolls, and promotions from YouTube across all desktop browsers.</div>
+        <div class="panel-sub">Deep payload interception that strips video prerolls, midrolls, and promotions from YouTube across all desktop and mobile browsers.</div>
         
         <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1.5rem;">
           
@@ -1479,13 +1751,10 @@
         <div class="panel-title">How YouTube Ad Defusal Works</div>
         <div style="font-size:0.85rem; color:var(--text-secondary); line-height:1.6; margin-top:0.5rem;">
           <p style="margin-bottom:0.6rem;">
-            1. <strong>Zero Playback Buffering:</strong> Video streams (<code class="code-box">*.googlevideo.com/videoplayback</code>) pass through a direct, zero-copy TCP tunnel. The proxy never re-encodes media chunks, preserving full 4K 60fps and 8K HDR throughput.
+            1. <strong>Zero Playback Buffering:</strong> Video streams pass through a direct, zero-copy TCP tunnel. The proxy never re-encodes media chunks, preserving full 4K 60fps throughput.
           </p>
           <p style="margin-bottom:0.6rem;">
-            2. <strong>Player API Sanitization:</strong> When your browser requests <code class="code-box">POST /youtubei/v1/player</code>, Sinkhole intercepts the response, deletes all ad cues, and returns the sanitized payload. YouTube's frontend player starts the video immediately with 0 ads scheduled.
-          </p>
-          <p>
-            3. <strong>Scriptlet Shield:</strong> Injects an in-browser defuser script that ensures dynamic SPA navigations stay ad-free.
+            2. <strong>Player API Sanitization:</strong> Intercepts <code class="code-box">POST /youtubei/v1/player</code>, strips ad cues, and starts the video with 0 ads scheduled.
           </p>
         </div>
       </div>
@@ -1498,7 +1767,7 @@
         <div class="panel-sub">Inspect and filter HTTPS traffic across Chrome, Edge, Brave, and Firefox without browser security warnings.</div>
         
         <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); padding:1rem 1.25rem; border-radius:var(--radius-md); border:1px solid var(--glass-border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); padding:1rem 1.25rem; border-radius:var(--radius-md); border:1px solid var(--glass-border); flex-wrap:wrap; gap:0.5rem;">
             <div>
               <div style="font-weight:600; font-size:0.95rem;" id="caSubject">Sinkhole HTTPS Filtering Root CA</div>
               <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.25rem;" id="caDetails">Checking certificate status...</div>
@@ -1518,13 +1787,13 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Windows 11 System Proxy & PAC Controller</div>
-        <div class="panel-sub">Direct all desktop browsers to the local inspection proxy (127.0.0.1:8080) with automatic local bypass.</div>
+        <div class="panel-title">System Proxy & PAC Controller</div>
+        <div class="panel-sub">Direct desktop browsers to the local inspection proxy (127.0.0.1:8080) with automatic local bypass.</div>
         
-        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); padding:1rem 1.25rem; border-radius:var(--radius-md); border:1px solid var(--glass-border); margin-top:1rem; margin-bottom:1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); padding:1rem 1.25rem; border-radius:var(--radius-md); border:1px solid var(--glass-border); margin-top:1rem; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
           <div>
             <div style="font-weight:600; font-size:0.95rem;" id="proxyStatusTitle">System Proxy Status</div>
-            <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.25rem;" id="proxyStatusDetails">Inspecting Windows proxy configuration...</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.25rem;" id="proxyStatusDetails">Inspecting proxy configuration...</div>
           </div>
           <div style="display:flex; gap:0.6rem;">
             <button class="btn btn-primary btn-sm" id="enableProxyBtn" onclick="enableSystemProxy()">Activate Proxy</button>
@@ -1533,7 +1802,7 @@
         </div>
 
         <div style="font-size:0.8rem; color:var(--text-secondary);">
-          PAC Auto-Config URL: <a href="/proxy.pac" target="_blank" style="color:var(--apple-blue); font-weight:500;">http://127.0.0.1:3002/proxy.pac</a> (Automatically excludes intranet, 192.168.*, and banking domains).
+          PAC Auto-Config URL: <a href="/proxy.pac" target="_blank" style="color:var(--apple-blue); font-weight:500;">http://127.0.0.1:3002/proxy.pac</a>
         </div>
       </div>
     </div>
@@ -1544,18 +1813,18 @@
         <div class="panel-title">Add Cosmetic Element-Hiding Rule</div>
         <div class="panel-sub">Block specific ad banners or clutter by CSS selector (AdBlock / uBlock Origin syntax).</div>
         <form onsubmit="submitCosmeticRule(event)" style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.75rem;">
-          <input type="text" id="newCosmeticRuleInput" placeholder="example.com##.sponsor-banner or ##.global-ad" style="flex:1; min-width:300px;" required>
+          <input type="text" id="newCosmeticRuleInput" placeholder="example.com##.sponsor-banner or ##.global-ad" style="flex:1; min-width:250px;" required>
           <button type="submit" class="btn btn-primary">+ Add Cosmetic Rule</button>
         </form>
         <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.65rem;">
-          Active in-page cosmetic rules loaded: <strong style="color:var(--apple-blue);" id="cosmeticRulesCount" class="num-tnum">0</strong>
+          Active cosmetic rules: <strong style="color:var(--apple-blue);" id="cosmeticRulesCount" class="num-tnum">0</strong>
         </div>
       </div>
 
       <div class="table-container">
         <div class="table-toolbar">
           <div>
-            <strong>Real-Time HTTP/HTTPS Decrypted Traffic Stream</strong>
+            <strong>Decrypted Traffic Stream</strong>
           </div>
           <div class="input-group">
             <button class="btn btn-secondary btn-sm" onclick="clearInspectorStream()">Clear Stream</button>
@@ -1582,6 +1851,61 @@
 
   </main>
 
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-bottom-bar">
+    <button class="mobile-nav-item active" onclick="switchView('overview')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+      <span>Overview</span>
+    </button>
+    <button class="mobile-nav-item" onclick="switchView('querylog')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v9h-9"/></svg>
+      <span>Query Log</span>
+    </button>
+    <button class="mobile-nav-item" onclick="switchView('youtube')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <span>YouTube</span>
+    </button>
+    <button class="mobile-nav-item" onclick="switchView('rules')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>Rules</span>
+    </button>
+    <button class="mobile-nav-item" onclick="toggleDrawer()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      <span>Menu</span>
+    </button>
+  </nav>
+
+  <!-- Server Connection Settings Modal -->
+  <div class="modal-backdrop" id="serverModal" onclick="closeServerModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h3 style="font-size:1.15rem; font-weight:700;">Connect to Sinkhole Server</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeServerModal()">✕</button>
+      </div>
+      <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:1.25rem;">
+        Specify the IP and port of your Sinkhole server on your home Wi-Fi or LAN.
+      </p>
+      
+      <div class="form-row">
+        <label>Server Base URL</label>
+        <input type="text" id="customServerInput" placeholder="http://192.168.1.100:3002">
+        <div class="form-help">Default: local host or origin server.</div>
+      </div>
+
+      <div style="display:flex; gap:0.5rem; margin-bottom:1.25rem; flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://127.0.0.1:3002')">127.0.0.1:3002</button>
+        <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://10.0.2.2:3002')">10.0.2.2 (Emulator)</button>
+        <button class="btn btn-secondary btn-sm" onclick="useCurrentOrigin()">Use Origin</button>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn btn-secondary" onclick="testServerConnection()">Test Connection</button>
+        <button class="btn btn-primary" onclick="saveServerUrl()">Save &amp; Connect</button>
+      </div>
+      <div id="serverTestFeedback" style="margin-top:0.75rem; font-size:0.8rem; display:none;"></div>
+    </div>
+  </div>
+
   <!-- Fluid Sonner-Grade Toast -->
   <div id="toast" class="toast">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
@@ -1598,6 +1922,7 @@
     let rawQueryLogs = [];
     let rawInspectorLogs = [];
     let serverConfig = null;
+    let serverBaseUrl = localStorage.getItem('sinkhole_server_url') || '';
 
     const views = {
       overview: { title: 'Overview & Telemetry', desc: 'Real-time Windows DNS sinkhole metrics and filtering activity.' },
@@ -1608,8 +1933,157 @@
       https: { title: 'HTTPS Inspection & Root Certificate Authority', desc: 'Manage Windows Root CA trust and transparent proxy settings for deep browser filtering.' },
       inspector: { title: 'HTTP/HTTPS Traffic & Element Inspector', desc: 'Real-time log of decrypted requests, sanitized video payloads, and injected cosmetic rules.' },
       settings: { title: 'DNS & Upstream Settings', desc: 'Configure upstream DNS-over-HTTPS/UDP resolvers and caching.' },
-      network: { title: 'Adapters & Home Router Guide', desc: 'Configure local Windows 11 adapters and home router DHCP distribution.' }
+      network: { title: 'Adapters & Android Protection', desc: 'Configure local Windows 11 adapters, home router DHCP, and Android Private DNS.' }
     };
+
+    // -------------------------------------------------------------
+    // NATIVE ANDROID BRIDGE & HAPTICS
+    // -------------------------------------------------------------
+    function triggerHaptic(type = 'click') {
+      try {
+        if (window.Android && typeof window.Android.triggerHaptic === 'function') {
+          window.Android.triggerHaptic(type);
+        } else if (navigator.vibrate) {
+          navigator.vibrate(8);
+        }
+      } catch (e) {}
+    }
+
+    function openAndroidPrivateDNS() {
+      triggerHaptic('heavy');
+      if (window.Android && typeof window.Android.openPrivateDNSSettings === 'function') {
+        window.Android.openPrivateDNSSettings();
+      } else {
+        showToast('Open Settings > Network & internet > Private DNS on Android');
+      }
+    }
+
+    function copyLanIp() {
+      triggerHaptic('click');
+      const ip = document.getElementById('androidLanIpDisplay').textContent;
+      navigator.clipboard.writeText(ip).then(() => {
+        showToast(`Copied ${ip} to clipboard`);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // DRAWER & MOBILE NAVIGATION
+    // -------------------------------------------------------------
+    function toggleDrawer() {
+      triggerHaptic('click');
+      const drawer = document.getElementById('sideNavDrawer');
+      const scrim = document.getElementById('drawerScrim');
+      drawer.classList.toggle('drawer-open');
+      scrim.classList.toggle('drawer-open');
+    }
+
+    function closeDrawer() {
+      const drawer = document.getElementById('sideNavDrawer');
+      const scrim = document.getElementById('drawerScrim');
+      drawer.classList.remove('drawer-open');
+      scrim.classList.remove('drawer-open');
+    }
+
+    function switchView(viewName) {
+      triggerHaptic('click');
+      closeDrawer();
+      if (currentView === viewName) return;
+      currentView = viewName;
+
+      // Update Desktop Nav
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.textContent.toLowerCase().includes(viewName.slice(0, 4)));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Update Mobile Bottom Bar
+      document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active'));
+      const activeMobileBtn = Array.from(document.querySelectorAll('.mobile-nav-item')).find(b => b.textContent.toLowerCase().includes(viewName.slice(0, 4)));
+      if (activeMobileBtn) activeMobileBtn.classList.add('active');
+
+      // Switch Container
+      document.querySelectorAll('.view-container').forEach(c => c.classList.remove('active'));
+      const target = document.getElementById(`view-${viewName}`);
+      if (target) target.classList.add('active');
+
+      document.getElementById('pageTitle').textContent = views[viewName].title;
+      document.getElementById('pageDesc').textContent = views[viewName].desc;
+
+      refreshCurrentView();
+    }
+
+    // -------------------------------------------------------------
+    // SERVER CONNECTION MANAGER
+    // -------------------------------------------------------------
+    function getApiUrl(path) {
+      if (serverBaseUrl) {
+        return serverBaseUrl.replace(/\/+$/, '') + path;
+      }
+      return path;
+    }
+
+    function openServerModal() {
+      triggerHaptic('click');
+      document.getElementById('customServerInput').value = serverBaseUrl || window.location.origin;
+      document.getElementById('serverModal').classList.add('active');
+      document.getElementById('serverTestFeedback').style.display = 'none';
+    }
+
+    function closeServerModal(e) {
+      document.getElementById('serverModal').classList.remove('active');
+    }
+
+    function setQuickServer(url) {
+      document.getElementById('customServerInput').value = url;
+    }
+
+    function useCurrentOrigin() {
+      document.getElementById('customServerInput').value = window.location.origin;
+    }
+
+    async function testServerConnection() {
+      const url = document.getElementById('customServerInput').value.trim();
+      const fb = document.getElementById('serverTestFeedback');
+      fb.style.display = 'block';
+      fb.textContent = 'Testing connection...';
+      try {
+        const res = await fetch((url.replace(/\/+$/, '')) + '/api/status', {
+          headers: { 'X-Sinkhole': '1' }
+        });
+        if (res.ok) {
+          const d = await res.json();
+          fb.innerHTML = `<span style="color:var(--apple-green);font-weight:600">✓ Connected successfully!</span> Engine v${d.version} (${(d.lists?.list_rules || 0).toLocaleString()} rules)`;
+        } else {
+          fb.innerHTML = `<span style="color:var(--apple-red)">Failed: HTTP ${res.status}</span>`;
+        }
+      } catch (err) {
+        fb.innerHTML = `<span style="color:var(--apple-red)">Error: ${err.message}</span>`;
+      }
+    }
+
+    function saveServerUrl() {
+      const input = document.getElementById('customServerInput').value.trim();
+      if (input === window.location.origin || !input) {
+        serverBaseUrl = '';
+        localStorage.removeItem('sinkhole_server_url');
+      } else {
+        serverBaseUrl = input;
+        localStorage.setItem('sinkhole_server_url', input);
+      }
+      if (window.Android && typeof window.Android.saveServerUrl === 'function') {
+        window.Android.saveServerUrl(serverBaseUrl);
+      }
+      updateServerLabels();
+      closeServerModal();
+      showToast('Server connection target updated');
+      refreshCurrentView();
+      setupSSE();
+    }
+
+    function updateServerLabels() {
+      const display = serverBaseUrl ? serverBaseUrl.replace(/^https?:\/\//, '') : (window.location.host || '127.0.0.1:3002');
+      document.getElementById('currentServerLabel').textContent = display;
+      document.getElementById('topbarServerIp').textContent = display.split(':')[0] || '3002';
+    }
 
     // -------------------------------------------------------------
     // FLUID MICRO-SPRING ANIMATIONS & COUNTERS
@@ -1627,7 +2101,6 @@
       function step(now) {
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        // Critically damped spring approximation
         const ease = 1 - Math.pow(1 - progress, 3);
         const current = Math.round(start + diff * ease);
         el.textContent = current.toLocaleString() + suffix;
@@ -1650,26 +2123,9 @@
       t.classList.add('show');
       clearTimeout(t._hideTimer);
       t._hideTimer = setTimeout(() => t.classList.remove('show'), 3500);
-    }
-
-    function switchView(viewName) {
-      if (currentView === viewName) return;
-      currentView = viewName;
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.view-container').forEach(c => c.classList.remove('active'));
-
-      const activeBtn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.textContent.toLowerCase().includes(viewName.slice(0, 4)));
-      if (activeBtn) activeBtn.classList.add('active');
-
-      const target = document.getElementById(`view-${viewName}`);
-      if (target) {
-        target.classList.add('active');
+      if (window.Android && typeof window.Android.showToast === 'function') {
+        window.Android.showToast(msg);
       }
-
-      document.getElementById('pageTitle').textContent = views[viewName].title;
-      document.getElementById('pageDesc').textContent = views[viewName].desc;
-
-      refreshCurrentView();
     }
 
     function refreshCurrentView() {
@@ -1694,7 +2150,8 @@
         'X-Sinkhole': '1',
         ...(options.headers || {})
       };
-      const res = await fetch(path, options);
+      const url = getApiUrl(path);
+      const res = await fetch(url, options);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(err.error || `HTTP ${res.status}`);
@@ -1713,9 +2170,12 @@
         document.getElementById('protectionToggle').checked = data.protection;
         
         if (data.lan_addresses && data.lan_addresses.length > 0) {
-          document.getElementById('lanIpAddresses').textContent = data.lan_addresses.join(', ');
+          const ips = data.lan_addresses.join(', ');
+          document.getElementById('lanIpAddresses').textContent = ips;
+          document.getElementById('androidLanIpDisplay').textContent = data.lan_addresses[0];
         } else {
           document.getElementById('lanIpAddresses').textContent = '127.0.0.1 (Loopback)';
+          document.getElementById('androidLanIpDisplay').textContent = '127.0.0.1';
         }
       } catch (err) {
         console.error('Status fetch failed', err);
@@ -1723,6 +2183,7 @@
     }
 
     async function toggleProtection(enabled) {
+      triggerHaptic('click');
       try {
         await api('/api/protection', { method: 'POST', body: JSON.stringify({ enabled }) });
         showToast(`Sinkhole Protection ${enabled ? 'Enabled' : 'Disabled'}`);
@@ -1780,10 +2241,10 @@
         `;
       }).join('');
 
-      // Magnetic hover tracking
       const wrap = document.getElementById('chartBarsWrap');
       container.querySelectorAll('.bar-col').forEach(col => {
-        col.addEventListener('pointerenter', (e) => {
+        const onPointer = (e) => {
+          triggerHaptic('light');
           const time = col.dataset.time;
           const total = parseInt(col.dataset.total, 10).toLocaleString();
           const blocked = parseInt(col.dataset.blocked, 10).toLocaleString();
@@ -1795,8 +2256,10 @@
           const colRect = col.getBoundingClientRect();
           const wrapRect = wrap.getBoundingClientRect();
           const x = colRect.left + colRect.width / 2 - wrapRect.left;
-          tooltip.style.left = `${x}px`;
-        });
+          tooltip.style.left = `${Math.max(60, Math.min(x, wrapRect.width - 60))}px`;
+        };
+        col.addEventListener('pointerenter', onPointer);
+        col.addEventListener('pointerdown', onPointer);
       });
 
       wrap.addEventListener('pointerleave', () => {
@@ -1878,12 +2341,14 @@
     }
 
     function copyText(str) {
+      triggerHaptic('click');
       navigator.clipboard.writeText(str).then(() => {
         showToast(`Copied ${str} to clipboard`);
       });
     }
 
     function toggleLogPause() {
+      triggerHaptic('click');
       logPaused = !logPaused;
       document.getElementById('pauseLogBtn').textContent = logPaused ? 'Resume Stream' : 'Pause Stream';
     }
@@ -1901,6 +2366,7 @@
     }
 
     async function quickRule(domain, action) {
+      triggerHaptic('click');
       try {
         await api('/api/rules', {
           method: 'POST',
@@ -1954,13 +2420,14 @@
 
     async function addBlocklist(e) {
       e.preventDefault();
+      triggerHaptic('click');
       const name = document.getElementById('newListName').value;
       const url = document.getElementById('newListUrl').value;
       try {
         await api('/api/blocklists', { method: 'POST', body: JSON.stringify({ name, url }) });
         document.getElementById('newListName').value = '';
         document.getElementById('newListUrl').value = '';
-        showToast('Blocklist added. Downloading rules in background...');
+        showToast('Blocklist added. Downloading rules...');
         fetchBlocklists();
         setTimeout(fetchBlocklists, 3000);
       } catch (err) {
@@ -1969,6 +2436,7 @@
     }
 
     async function toggleBlocklist(id, enabled) {
+      triggerHaptic('click');
       try {
         await api(`/api/blocklists/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) });
         showToast(`Blocklist ${enabled ? 'enabled' : 'disabled'}`);
@@ -1979,6 +2447,7 @@
     }
 
     async function updateBlocklist(id) {
+      triggerHaptic('click');
       try {
         await api(`/api/blocklists/${id}/update`, { method: 'POST' });
         showToast('Update started');
@@ -1989,6 +2458,7 @@
     }
 
     async function updateAllBlocklists() {
+      triggerHaptic('click');
       try {
         await api('/api/blocklists/update', { method: 'POST' });
         showToast('Updating all blocklists in background...');
@@ -2037,6 +2507,7 @@
 
     async function addCustomRule(e) {
       e.preventDefault();
+      triggerHaptic('click');
       const domain = document.getElementById('ruleDomain').value;
       const action = document.getElementById('ruleAction').value;
       const subdomains = document.getElementById('ruleSubdomains').checked;
@@ -2063,6 +2534,7 @@
     }
 
     async function testDomainMatch() {
+      triggerHaptic('click');
       const d = document.getElementById('testDomainInput').value.trim();
       const resEl = document.getElementById('testDomainResult');
       if (!d) return;
@@ -2099,6 +2571,7 @@
     }
 
     async function saveSettings() {
+      triggerHaptic('click');
       if (!serverConfig) return;
       const upstreams = document.getElementById('settingUpstreams').value.split('\n').map(s => s.trim()).filter(Boolean);
       const fallbacks = document.getElementById('settingFallbacks').value.split(',').map(s => s.trim()).filter(Boolean);
@@ -2119,6 +2592,7 @@
     }
 
     async function flushCache() {
+      triggerHaptic('click');
       try {
         await api('/api/cache/flush', { method: 'POST' });
         showToast('In-memory DNS cache cleared');
@@ -2128,6 +2602,7 @@
     }
 
     async function testUpstreamLatency() {
+      triggerHaptic('click');
       const u = document.getElementById('testUpstreamInput').value.trim();
       const resEl = document.getElementById('testUpstreamResult');
       if (!u) return;
@@ -2163,27 +2638,27 @@
             <td><code style="font-size:0.8rem">${(a.ipv4_dns || []).join(', ') || 'DHCP'}</code></td>
             <td>
               ${a.uses_sinkhole ? 
-                '<span class="badge allowed"><span class="badge-dot"></span> Active (127.0.0.1)</span>' : 
+                '<span class="badge allowed"><span class="badge-dot"></span> Active</span>' : 
                 '<span style="color:var(--text-secondary);font-size:0.8rem">No</span>'
               }
             </td>
             <td>
               ${a.uses_sinkhole ?
-                `<button class="btn btn-secondary btn-sm" onclick="restoreAdapter(${a.index})">Restore Original DNS</button>` :
+                `<button class="btn btn-secondary btn-sm" onclick="restoreAdapter(${a.index})">Restore</button>` :
                 `<button class="btn btn-primary btn-sm" onclick="pointAdapterToSinkhole(${a.index})">Point to Sinkhole</button>`
               }
             </td>
           </tr>
         `).join('');
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--apple-amber)">Adapter query requires elevated privileges: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--apple-amber)">Adapter query: ${err.message}</td></tr>`;
       }
     }
 
     async function pointAdapterToSinkhole(index) {
       try {
         await api(`/api/system/adapters/${index}/sinkhole`, { method: 'POST' });
-        showToast('Adapter DNS updated to 127.0.0.1');
+        showToast('Adapter DNS updated');
         fetchAdapters();
       } catch (err) {
         showToast(err.message, true);
@@ -2216,6 +2691,7 @@
     }
 
     async function saveYouTubeConfig() {
+      triggerHaptic('click');
       const payload = {
         enabled: document.getElementById('ytEnableToggle').checked,
         block_prerolls: document.getElementById('ytPrerollsToggle').checked,
@@ -2239,25 +2715,26 @@
         const badge = document.getElementById('caTrustBadge');
         if (c.trusted) {
           badge.className = 'badge allowed';
-          badge.innerHTML = '<span class="badge-dot"></span> Trusted in Windows Store';
+          badge.innerHTML = '<span class="badge-dot"></span> Trusted in Store';
         } else {
           badge.className = 'badge error';
-          badge.innerHTML = '<span class="badge-dot"></span> Not Trusted / Pending Install';
+          badge.innerHTML = '<span class="badge-dot"></span> Not Trusted';
         }
         document.getElementById('caSubject').textContent = c.subject || 'Sinkhole Local CA';
         const expStr = c.expires ? new Date(c.expires).toLocaleDateString() : 'Unknown';
-        document.getElementById('caDetails').textContent = `Status: ${c.trusted ? 'Active' : 'Unregistered'} | Expires: ${expStr} | Path: ${c.cert_path}`;
+        document.getElementById('caDetails').textContent = `Status: ${c.trusted ? 'Active' : 'Unregistered'} | Expires: ${expStr}`;
       } catch (err) {
         console.error('CA status error', err);
       }
     }
 
     async function installRootCA() {
+      triggerHaptic('click');
       try {
         showToast('Installing Root CA into Windows Certificate Store...');
         const res = await api('/api/ca/install', { method: 'POST' });
         if (res.trusted) {
-          showToast('Root CA successfully installed & trusted in Windows!');
+          showToast('Root CA successfully installed & trusted!');
         } else {
           showToast('Certificate added to store');
         }
@@ -2279,7 +2756,8 @@
     }
 
     function downloadCACert() {
-      window.open('/api/ca/cert', '_blank');
+      triggerHaptic('click');
+      window.open(getApiUrl('/api/ca/cert'), '_blank');
     }
 
     async function fetchProxyStatus() {
@@ -2287,20 +2765,21 @@
         const p = await api('/api/proxy/status');
         const isEnabled = p.system_proxy && p.system_proxy.enabled;
         document.getElementById('proxyStatusTitle').textContent = isEnabled ?
-          'Windows System Proxy: ACTIVE' : 'Windows System Proxy: DISABLED';
+          'System Proxy: ACTIVE' : 'System Proxy: DISABLED';
         document.getElementById('proxyStatusTitle').style.color = isEnabled ? 'var(--apple-green)' : 'var(--text-secondary)';
         document.getElementById('proxyStatusDetails').textContent = isEnabled ?
-          `Browser traffic routing through proxy at ${p.proxy_listen} (AutoConfig: ${p.system_proxy.auto_config_url || 'None'})` :
-          'Direct internet connection active. Click Activate to route browser traffic through Sinkhole.';
+          `Routing through proxy at ${p.proxy_listen}` :
+          'Direct connection active. Click Activate to route browser traffic through Sinkhole.';
       } catch (err) {
         console.error('Proxy status error', err);
       }
     }
 
     async function enableSystemProxy() {
+      triggerHaptic('click');
       try {
         await api('/api/proxy/enable', { method: 'POST' });
-        showToast('Windows System Proxy enabled');
+        showToast('System Proxy enabled');
         fetchProxyStatus();
       } catch (err) {
         showToast(err.message, true);
@@ -2308,9 +2787,10 @@
     }
 
     async function disableSystemProxy() {
+      triggerHaptic('click');
       try {
         await api('/api/proxy/disable', { method: 'POST' });
-        showToast('Windows System Proxy disabled');
+        showToast('System Proxy disabled');
         fetchProxyStatus();
       } catch (err) {
         showToast(err.message, true);
@@ -2331,6 +2811,7 @@
 
     async function submitCosmeticRule(e) {
       e.preventDefault();
+      triggerHaptic('click');
       const rule = document.getElementById('newCosmeticRuleInput').value.trim();
       if (!rule) return;
       try {
@@ -2362,7 +2843,7 @@
             <td style="color:var(--text-secondary); font-size:0.75rem" class="num-tnum">${timeStr}</td>
             <td><span style="font-weight:600;font-size:0.75rem;">${ev.method}</span></td>
             <td><strong>${ev.host}</strong></td>
-            <td style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-secondary); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${ev.path}</td>
+            <td style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-secondary); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${ev.path}</td>
             <td><span class="badge ${badgeClass}"><span class="badge-dot"></span> ${ev.action}</span></td>
             <td style="font-size:0.8rem">${ev.details}</td>
             <td><code style="color:var(--apple-teal); font-size:0.75rem">${ev.client_ip || '127.0.0.1'}</code></td>
@@ -2372,6 +2853,7 @@
     }
 
     function clearInspectorStream() {
+      triggerHaptic('click');
       rawInspectorLogs = [];
       renderInspectorTable([]);
       showToast('Inspector stream cleared');
@@ -2382,7 +2864,8 @@
     // -------------------------------------------------------------
     function setupSSE() {
       if (sseSource) sseSource.close();
-      sseSource = new EventSource('/api/events');
+      const sseUrl = getApiUrl('/api/events');
+      sseSource = new EventSource(sseUrl);
       sseSource.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
@@ -2410,12 +2893,18 @@
         }
       };
       sseSource.onerror = () => {
-        // Retry handled automatically by EventSource
+        // Handled automatically by browser EventSource retry
       };
     }
 
     // Init
     window.addEventListener('DOMContentLoaded', () => {
+      // Check if native Android bridge provides saved server url
+      if (window.Android && typeof window.Android.getServerUrl === 'function') {
+        const saved = window.Android.getServerUrl();
+        if (saved) serverBaseUrl = saved;
+      }
+      updateServerLabels();
       fetchStatus();
       fetchStats();
       setupSSE();
