@@ -11,6 +11,9 @@
 - **Sub-Millisecond In-Memory Filtering:** Zero-allocation suffix-walking hash set matching capable of handling 500,000+ rules in under 1 microsecond per query.
 - **Rich List Syntax Support:** Parses standard `hosts` files, AdBlock-syntax lists (e.g. `||tracker.com^`, `@@||whitelist.com^`), wildcard formats (`*.telemetry.microsoft.com`), and plain domain lists.
 - **Secure Upstream Forwarding:** Forwards permitted queries over **DNS-over-HTTPS (DoH)**, **DNS-over-TLS (DoT)**, or standard UDP/TCP with parallel racing or failover strategies.
+- **YouTube Video Ad Elimination:** Deep player API sanitization (`/youtubei/v1/player`) and scriptlet defusal that strips preroll and midroll video ads, home page mastheads, and sponsored search cards before the player initializes.
+- **Universal HTTPS & Cosmetic Engine:** Built-in Root Certificate Authority (CA) and local proxy engine (`127.0.0.1:8080`) that decrypts, sanitizes, and injects cosmetic element-hiding CSS (`domain##selector`) across any browser.
+- **Zero-Buffering Video Passthrough:** High-speed raw TCP tunneling for media chunks (`*.googlevideo.com/videoplayback`) ensuring 4K/60fps and 8K HDR playback without buffering or CPU overhead.
 - **Loopback Isolation via Bootstrap Resolver:** Employs an independent bootstrap DNS client to resolve DoH upstream hostnames, avoiding resolution deadlocks when Windows points to `127.0.0.1`.
 - **Pure-Go Embedded SQLite:** Embedded SQLite storage (pure Go, zero CGO requirement) with WAL mode for query logging, settings, blocklist metadata, and custom rules.
 - **Embedded Web Dashboard:** Single-binary distribution with embedded HTML5/CSS3/JavaScript dashboard featuring real-time Server-Sent Events (SSE), 24h query charts, live query stream, blocklist manager, custom rule overrides, and network adapter controls.
