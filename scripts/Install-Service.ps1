@@ -48,4 +48,4 @@ Write-Host "`nStarting Sinkhole service..." -ForegroundColor Cyan
 # Check status
 Start-Sleep -Seconds 1
 & $ExePath service status
-Write-Host "`nSinkhole background service is running! Visit http://127.0.0.1:3000" -ForegroundColor Green
+Write-Host "`nSinkhole background service is running! Visit http://127.0.0.1:3002" -ForegroundColor Green

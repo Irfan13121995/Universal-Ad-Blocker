@@ -1,5 +1,5 @@
 // Package web serves the admin dashboard (embedded static files) and its JSON
-// API on the configured address (default http://127.0.0.1:3000).
+// API on the configured address (default http://127.0.0.1:3002).
 package web
 
 import (

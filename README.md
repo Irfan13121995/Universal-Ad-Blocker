@@ -1,6 +1,6 @@
 # Sinkhole - Native Windows 11 Network Ad & Tracker Sinkhole
 
-**Sinkhole** is a lightweight, high-performance, self-hosted network ad and tracker sinkhole application built specifically for Windows 11. Functioning similarly to Pi-hole or AdGuard Home, it runs natively as a managed background **Windows Service** (`winsvc`), resolves network DNS queries on `0.0.0.0:53` (UDP and TCP), blocks ads and telemetry sub-millisecond in memory, and provides a modern embedded web administrative dashboard at `http://127.0.0.1:3000`.
+**Sinkhole** is a lightweight, high-performance, self-hosted network ad and tracker sinkhole application built specifically for Windows 11. Functioning similarly to Pi-hole or AdGuard Home, it runs natively as a managed background **Windows Service** (`winsvc`), resolves network DNS queries on `0.0.0.0:53` (UDP and TCP), blocks ads and telemetry sub-millisecond in memory, and provides a modern embedded web administrative dashboard at `http://127.0.0.1:3002`.
 
 ---
 
@@ -107,9 +107,9 @@ Starting Sinkhole v1.0.0 (Interactive Console Mode)...
 Data directory: C:\ProgramData\Sinkhole
 time=... level=INFO msg="blocklists compiled" unique_rules=457559 took=230ms
 time=... level=INFO msg="DNS server listening" addresses="0.0.0.0:53, [::]:53"
-time=... level=INFO msg="dashboard listening" url=http://127.0.0.1:3000
+time=... level=INFO msg="dashboard listening" url=http://127.0.0.1:3002
 ✓ DNS Server active on: [0.0.0.0:53 [::]:53] (UDP & TCP)
-✓ Admin Dashboard:     http://127.0.0.1:3000
+✓ Admin Dashboard:     http://127.0.0.1:3002
 ✓ Press Ctrl+C to shut down cleanly.
 ```
 
@@ -190,7 +190,7 @@ Addresses:  2606:4700:10::6814:179a
 ### 4. Admin Web Dashboard
 Open your browser to:
 ```
-http://127.0.0.1:3000
+http://127.0.0.1:3002
 ```
 - **Overview:** Real-time counters of queries today, blocked queries, block %, and 24h volume chart.
 - **Live Query Log:** Streaming log of requests, status badges (Allowed, Blocked, Cached), and 1-click domain actions.
@@ -202,13 +202,13 @@ http://127.0.0.1:3000
 
 ## Network Configuration & Setup Helper
 
-### 1. Configure Windows Firewall (Port 53 & 3000)
+### 1. Configure Windows Firewall (Port 53 & 3002)
 To allow other devices on your home network to query this Windows host:
 ```powershell
 # Run from an elevated (Administrator) PowerShell session:
 .\scripts\Setup-Firewall.ps1
 ```
-This automatically configures inbound rules for UDP Port 53, TCP Port 53, and TCP Port 3000.
+This automatically configures inbound rules for UDP Port 53, TCP Port 53, and TCP Port 3002.
 
 ### 2. Local Windows Adapter Setup (1-Click Local Testing)
 To redirect your local Windows 11 machine to use the sinkhole:

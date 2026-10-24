@@ -5,7 +5,7 @@
 [CmdletBinding()]
 param(
     [int]$DnsPort = 53,
-    [int]$WebPort = 3000
+    [int]$WebPort = 3002
 )
 
 $ErrorActionPreference = 'Stop'

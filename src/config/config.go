@@ -80,7 +80,7 @@ type YouTubeConfig struct {
 func Default() Config {
 	return Config{
 		DNSListen: []string{"0.0.0.0:53", "[::]:53"},
-		WebListen: "127.0.0.1:3000",
+		WebListen: "127.0.0.1:3002",
 		ProxyListen: "127.0.0.1:8080",
 		HTTPSFiltering: true,
 		YouTubeShield: YouTubeConfig{
@@ -123,7 +123,7 @@ func (c *Config) Normalize() {
 	if len(c.DNSListen) == 0 {
 		c.DNSListen = d.DNSListen
 	}
-	if c.WebListen == "" {
+	if c.WebListen == "" || c.WebListen == "127.0.0.1:3000" || c.WebListen == ":3000" {
 		c.WebListen = d.WebListen
 	}
 	if c.ProxyListen == "" {

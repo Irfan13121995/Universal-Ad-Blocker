@@ -4,7 +4,7 @@
 [CmdletBinding()]
 param(
     [string]$ProxyServer = "127.0.0.1:8080",
-    [string]$PacUrl = "http://127.0.0.1:3000/proxy.pac"
+    [string]$PacUrl = "http://127.0.0.1:3002/proxy.pac"
 )
 
 $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
