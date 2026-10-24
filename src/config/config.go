@@ -46,6 +46,11 @@ type Config struct {
 	UpstreamMode      string   `json:"upstream_mode"`
 	UpstreamTimeoutMs int      `json:"upstream_timeout_ms"`
 
+	// ProxyListen is the address of the local HTTPS inspection and YouTube filtering proxy.
+	ProxyListen        string        `json:"proxy_listen"`
+	HTTPSFiltering     bool          `json:"https_filtering"`
+	YouTubeShield      YouTubeConfig `json:"youtube_shield"`
+
 	ProtectionEnabled bool   `json:"protection_enabled"`
 	BlockMode         string `json:"block_mode"`
 	BlockedTTL        uint32 `json:"blocked_ttl"`
@@ -63,11 +68,27 @@ type Config struct {
 	UpdateIntervalHours int  `json:"update_interval_hours"`
 }
 
+// YouTubeConfig controls YouTube video ad and cosmetic filtering options.
+type YouTubeConfig struct {
+	Enabled       bool `json:"enabled"`
+	BlockPrerolls bool `json:"block_prerolls"`
+	BlockBanners  bool `json:"block_banners"`
+	BlockShorts   bool `json:"block_shorts"`
+}
+
 // Default returns the configuration used on first start.
 func Default() Config {
 	return Config{
 		DNSListen: []string{"0.0.0.0:53", "[::]:53"},
 		WebListen: "127.0.0.1:3000",
+		ProxyListen: "127.0.0.1:8080",
+		HTTPSFiltering: true,
+		YouTubeShield: YouTubeConfig{
+			Enabled:       true,
+			BlockPrerolls: true,
+			BlockBanners:  true,
+			BlockShorts:   false,
+		},
 		Upstreams: []string{
 			"https://cloudflare-dns.com/dns-query",
 			"https://dns.quad9.net/dns-query",
@@ -104,6 +125,9 @@ func (c *Config) Normalize() {
 	}
 	if c.WebListen == "" {
 		c.WebListen = d.WebListen
+	}
+	if c.ProxyListen == "" {
+		c.ProxyListen = d.ProxyListen
 	}
 	if len(c.Bootstrap) == 0 {
 		c.Bootstrap = d.Bootstrap

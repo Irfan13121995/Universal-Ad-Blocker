@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net"
@@ -23,8 +24,11 @@ import (
 
 	"sinkhole/src/config"
 	"sinkhole/src/server/blocklists"
+	"sinkhole/src/server/ca"
 	"sinkhole/src/server/cache"
+	"sinkhole/src/server/content"
 	"sinkhole/src/server/filter"
+	"sinkhole/src/server/proxy"
 	"sinkhole/src/server/stats"
 	"sinkhole/src/server/upstream"
 	"sinkhole/src/store"
@@ -48,6 +52,10 @@ type Deps struct {
 	Version string
 	DataDir string
 	Started time.Time
+
+	CA       *ca.CA
+	Cosmetic *content.CosmeticEngine
+	Proxy    *proxy.Proxy
 
 	Config      func() config.Config
 	ApplyConfig func(config.Config) (restartRequired bool, err error)
@@ -129,6 +137,19 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/system/adapters", s.adapters)
 	mux.HandleFunc("POST /api/system/adapters/{index}/sinkhole", s.adapterSinkhole)
 	mux.HandleFunc("POST /api/system/adapters/{index}/restore", s.adapterRestore)
+
+	mux.HandleFunc("GET /proxy.pac", s.proxyPAC)
+	mux.HandleFunc("GET /api/ca/status", s.caStatus)
+	mux.HandleFunc("POST /api/ca/install", s.caInstall)
+	mux.HandleFunc("POST /api/ca/uninstall", s.caUninstall)
+	mux.HandleFunc("GET /api/ca/cert", s.caDownloadCert)
+	mux.HandleFunc("GET /api/proxy/status", s.proxyStatus)
+	mux.HandleFunc("POST /api/proxy/enable", s.proxyEnable)
+	mux.HandleFunc("POST /api/proxy/disable", s.proxyDisable)
+	mux.HandleFunc("GET /api/youtube", s.getYoutube)
+	mux.HandleFunc("PUT /api/youtube", s.putYoutube)
+	mux.HandleFunc("GET /api/cosmetic/rules", s.getCosmeticRules)
+	mux.HandleFunc("POST /api/cosmetic/rules", s.addCosmeticRule)
 
 	return s.middleware(mux)
 }
@@ -698,5 +719,170 @@ func (s *Server) adapterRestore(w http.ResponseWriter, r *http.Request) {
 	delete(backups, key)
 	_ = s.saveBackups(backups)
 	s.d.Log.Info("adapter DNS restored", "index", id)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// ---------------------------------------------------------------- CA & Proxy & YouTube
+
+func (s *Server) proxyPAC(w http.ResponseWriter, r *http.Request) {
+	cfg := s.d.Config()
+	host, port, _ := net.SplitHostPort(cfg.ProxyListen)
+	if host == "" || host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	pac := fmt.Sprintf(`function FindProxyForURL(url, host) {
+    if (isPlainHostName(host) ||
+        shExpMatch(host, "*.local") ||
+        isInNet(dnsResolve(host), "10.0.0.0", "255.0.0.0") ||
+        isInNet(dnsResolve(host), "172.16.0.0", "255.240.0.0") ||
+        isInNet(dnsResolve(host), "192.168.0.0", "255.255.0.0") ||
+        isInNet(dnsResolve(host), "127.0.0.0", "255.0.0.0")) {
+        return "DIRECT";
+    }
+    return "PROXY %s:%s; DIRECT";
+}`, host, port)
+	w.Header().Set("Content-Type", "application/x-ns-proxy-autoconfig")
+	_, _ = w.Write([]byte(pac))
+}
+
+func (s *Server) caStatus(w http.ResponseWriter, r *http.Request) {
+	if s.d.CA == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"generated": false, "trusted": false})
+		return
+	}
+	cert := s.d.CA.RootCertificate()
+	if cert == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"generated": false, "trusted": false})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"generated": true,
+		"trusted":   s.d.CA.IsTrusted(),
+		"subject":   cert.Subject.CommonName,
+		"expires":   cert.NotAfter.UnixMilli(),
+		"cert_path": s.d.CA.CertPath(),
+	})
+}
+
+func (s *Server) caInstall(w http.ResponseWriter, r *http.Request) {
+	if s.d.CA == nil {
+		writeErr(w, http.StatusBadRequest, errors.New("CA not initialized"))
+		return
+	}
+	if err := s.d.CA.InstallWindowsRoot(); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "trusted": s.d.CA.IsTrusted()})
+}
+
+func (s *Server) caUninstall(w http.ResponseWriter, r *http.Request) {
+	if s.d.CA == nil {
+		writeErr(w, http.StatusBadRequest, errors.New("CA not initialized"))
+		return
+	}
+	if err := s.d.CA.UninstallWindowsRoot(); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) caDownloadCert(w http.ResponseWriter, r *http.Request) {
+	if s.d.CA == nil {
+		http.Error(w, "CA not initialized", http.StatusNotFound)
+		return
+	}
+	http.ServeFile(w, r, s.d.CA.CertPath())
+}
+
+func (s *Server) proxyStatus(w http.ResponseWriter, r *http.Request) {
+	st, err := system.GetProxyStatus()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	cfg := s.d.Config()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"system_proxy": st,
+		"proxy_listen": cfg.ProxyListen,
+		"filtering":    cfg.HTTPSFiltering,
+	})
+}
+
+func (s *Server) proxyEnable(w http.ResponseWriter, r *http.Request) {
+	cfg := s.d.Config()
+	host, port, _ := net.SplitHostPort(cfg.ProxyListen)
+	if host == "" || host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	proxyAddr := net.JoinHostPort(host, port)
+	pacURL := "http://" + cfg.WebListen + "/proxy.pac"
+	if err := system.EnableSystemProxy(proxyAddr, pacURL); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) proxyDisable(w http.ResponseWriter, r *http.Request) {
+	if err := system.DisableSystemProxy(); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) getYoutube(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.d.Config().YouTubeShield)
+}
+
+func (s *Server) putYoutube(w http.ResponseWriter, r *http.Request) {
+	var in config.YouTubeConfig
+	if err := readJSON(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	cfg := s.d.Config()
+	cfg.YouTubeShield = in
+	if _, err := s.d.ApplyConfig(cfg); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	if s.d.Proxy != nil {
+		s.d.Proxy.SetYouTubeShield(content.YouTubeShield{
+			Enabled:       in.Enabled,
+			BlockPrerolls: in.BlockPrerolls,
+			BlockBanners:  in.BlockBanners,
+			BlockShorts:   in.BlockShorts,
+		})
+	}
+	writeJSON(w, http.StatusOK, cfg.YouTubeShield)
+}
+
+func (s *Server) getCosmeticRules(w http.ResponseWriter, r *http.Request) {
+	count := 0
+	if s.d.Cosmetic != nil {
+		count = s.d.Cosmetic.RuleCount()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"rule_count": count})
+}
+
+func (s *Server) addCosmeticRule(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Rule string `json:"rule"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if s.d.Cosmetic == nil {
+		writeErr(w, http.StatusBadRequest, errors.New("cosmetic engine not active"))
+		return
+	}
+	if ok := s.d.Cosmetic.AddRule(in.Rule); !ok {
+		writeErr(w, http.StatusBadRequest, errors.New("invalid cosmetic rule syntax (expected e.g. domain##.selector)"))
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

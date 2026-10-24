@@ -5,14 +5,18 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"sinkhole/src/config"
 	"sinkhole/src/server"
 	"sinkhole/src/server/blocklists"
+	"sinkhole/src/server/ca"
 	"sinkhole/src/server/cache"
+	"sinkhole/src/server/content"
 	"sinkhole/src/server/filter"
+	"sinkhole/src/server/proxy"
 	"sinkhole/src/server/stats"
 	"sinkhole/src/server/upstream"
 	"sinkhole/src/store"
@@ -25,20 +29,23 @@ type App struct {
 	DataDir string
 	Log     *slog.Logger
 
-	mu        sync.RWMutex
-	cfg       config.Config
-	st        *store.Store
-	engine    *filter.Engine
-	cache     *cache.Cache
-	boot      *upstream.Bootstrap
-	ups       *upstream.Group
-	stats     *stats.Stats
-	rec       *server.Recorder
-	dnsSrv    *server.Server
-	lists     *blocklists.Manager
-	hub       *web.Hub
-	webSrv    *web.Server
-	startedAt time.Time
+	mu         sync.RWMutex
+	cfg        config.Config
+	st         *store.Store
+	engine     *filter.Engine
+	cache      *cache.Cache
+	boot       *upstream.Bootstrap
+	ups        *upstream.Group
+	stats      *stats.Stats
+	rec        *server.Recorder
+	dnsSrv     *server.Server
+	lists      *blocklists.Manager
+	caInstance *ca.CA
+	cosmetic   *content.CosmeticEngine
+	proxySrv   *proxy.Proxy
+	hub        *web.Hub
+	webSrv     *web.Server
+	startedAt  time.Time
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -114,6 +121,25 @@ func New(dataDir string, version string, logger *slog.Logger) (*App, error) {
 	}
 	a.lists = mgr
 
+	// Root Certificate Authority (for HTTPS inspection)
+	caInst, err := ca.LoadOrGenerate(filepath.Join(dataDir, "certs"))
+	if err != nil {
+		logger.Warn("init Root CA failed", "err", err)
+	}
+	a.caInstance = caInst
+
+	// Cosmetic & Scriptlet Engine
+	a.cosmetic = content.NewCosmeticEngine()
+
+	// HTTPS & YouTube Inspection Proxy
+	a.proxySrv = proxy.New(cfg.ProxyListen, a.caInstance, a.engine, a.cosmetic, logger)
+	a.proxySrv.SetYouTubeShield(content.YouTubeShield{
+		Enabled:       cfg.YouTubeShield.Enabled,
+		BlockPrerolls: cfg.YouTubeShield.BlockPrerolls,
+		BlockBanners:  cfg.YouTubeShield.BlockBanners,
+		BlockShorts:   cfg.YouTubeShield.BlockShorts,
+	})
+
 	// Web SSE hub
 	a.hub = web.NewHub(a.stats)
 	a.rec.SetPublisher(a.hub)
@@ -131,6 +157,9 @@ func New(dataDir string, version string, logger *slog.Logger) (*App, error) {
 		Version:     version,
 		DataDir:     dataDir,
 		Started:     a.startedAt,
+		CA:          a.caInstance,
+		Cosmetic:    a.cosmetic,
+		Proxy:       a.proxySrv,
 		Config:      a.GetConfig,
 		ApplyConfig: a.ApplyConfig,
 		DNSBound:    a.dnsSrv.Bound,
@@ -164,12 +193,33 @@ func (a *App) Start() error {
 	go a.rec.Run(a.ctx)
 	go a.hub.Run(a.ctx)
 
+	// Forward Proxy inspection events to Web SSE Hub
+	if a.proxySrv != nil {
+		go func() {
+			for {
+				select {
+				case <-a.ctx.Done():
+					return
+				case ev := <-a.proxySrv.EventChannel():
+					a.hub.PublishEvent(ev)
+				}
+			}
+		}()
+	}
+
 	// 5. Start DNS Server on configured addresses (0.0.0.0:53 UDP+TCP)
 	if err := a.dnsSrv.Start(a.cfg.DNSListen); err != nil {
 		return fmt.Errorf("start DNS server: %w", err)
 	}
 
-	// 6. Start Web Dashboard HTTP server
+	// 6. Start HTTPS & YouTube Filtering Proxy
+	if a.cfg.HTTPSFiltering && a.proxySrv != nil {
+		if err := a.proxySrv.Start(); err != nil {
+			a.Log.Warn("start HTTPS inspection proxy failed", "err", err)
+		}
+	}
+
+	// 7. Start Web Dashboard HTTP server
 	if a.cfg.WebListen != "" {
 		if err := a.webSrv.Start(a.cfg.WebListen); err != nil {
 			a.Log.Error("start web dashboard failed", "addr", a.cfg.WebListen, "err", err)
@@ -204,7 +254,12 @@ func (a *App) Stop() {
 		a.dnsSrv.Stop()
 	}
 
-	// 2. Stop Web server
+	// 2. Stop HTTPS Proxy
+	if a.proxySrv != nil {
+		a.proxySrv.Stop()
+	}
+
+	// 3. Stop Web server
 	if a.webSrv != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		a.webSrv.Stop(ctx)
@@ -262,6 +317,16 @@ func (a *App) ApplyConfig(newCfg config.Config) (restartRequired bool, err error
 
 	// Query logging setting
 	a.rec.SetPersist(newCfg.LogQueries)
+
+	// Hot reload YouTube Shield parameters
+	if a.proxySrv != nil {
+		a.proxySrv.SetYouTubeShield(content.YouTubeShield{
+			Enabled:       newCfg.YouTubeShield.Enabled,
+			BlockPrerolls: newCfg.YouTubeShield.BlockPrerolls,
+			BlockBanners:  newCfg.YouTubeShield.BlockBanners,
+			BlockShorts:   newCfg.YouTubeShield.BlockShorts,
+		})
+	}
 
 	a.cfg = newCfg
 

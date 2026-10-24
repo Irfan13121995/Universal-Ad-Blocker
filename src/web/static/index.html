@@ -609,6 +609,18 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
         Custom Rules
       </button>
+      <button class="nav-btn" onclick="switchView('youtube')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        YouTube Shield
+      </button>
+      <button class="nav-btn" onclick="switchView('https')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        HTTPS & Root CA
+      </button>
+      <button class="nav-btn" onclick="switchView('inspector')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Traffic Inspector
+      </button>
       <button class="nav-btn" onclick="switchView('settings')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         DNS & Upstream
@@ -982,6 +994,160 @@
       </div>
     </div>
 
+    <!-- VIEW 7: YOUTUBE SHIELD -->
+    <div id="view-youtube" class="view-container">
+      <div class="panel">
+        <div class="panel-title">YouTube Shield & Video Ad Defusal</div>
+        <div class="panel-sub">Deep payload interception that strips video prerolls, midrolls, and promotions from YouTube across all desktop browsers.</div>
+        
+        <div style="display:flex; flex-direction:column; gap:1.25rem; margin-top:1.5rem;">
+          <label class="switch-label" style="justify-content:space-between; width:100%;">
+            <div>
+              <div style="font-weight:600;">Enable YouTube Shield</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Master switch for deep YouTube player API sanitization and cosmetic defusal.</div>
+            </div>
+            <input type="checkbox" id="ytEnableToggle">
+            <div class="toggle"></div>
+          </label>
+
+          <label class="switch-label" style="justify-content:space-between; width:100%;">
+            <div>
+              <div style="font-weight:600;">Strip Video Ads (Prerolls & Midrolls)</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Removes adPlacements, playerAds, and adSlots from /youtubei/v1/player JSON.</div>
+            </div>
+            <input type="checkbox" id="ytPrerollsToggle" checked>
+            <div class="toggle"></div>
+          </label>
+
+          <label class="switch-label" style="justify-content:space-between; width:100%;">
+            <div>
+              <div style="font-weight:600;">Hide Banners, Masthead & Sponsored Search Cards</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Injects cosmetic CSS rules to eliminate UI ad clutter and home page promotions.</div>
+            </div>
+            <input type="checkbox" id="ytBannersToggle" checked>
+            <div class="toggle"></div>
+          </label>
+
+          <label class="switch-label" style="justify-content:space-between; width:100%;">
+            <div>
+              <div style="font-weight:600;">Hide YouTube Shorts Shelf</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Cleanses the home page and subscription feeds of short-form video shelves.</div>
+            </div>
+            <input type="checkbox" id="ytShortsToggle">
+            <div class="toggle"></div>
+          </label>
+
+          <div style="margin-top:0.5rem;">
+            <button class="btn btn-primary" onclick="saveYouTubeConfig()">Save YouTube Settings</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">How YouTube Ad Defusal Works</div>
+        <div style="font-size:0.85rem; color:var(--text-muted); line-height:1.6; margin-top:0.5rem;">
+          <p style="margin-bottom:0.5rem;">
+            1. <strong>Zero Playback Buffering:</strong> Video streams (<code class="code-box">*.googlevideo.com/videoplayback</code>) pass through a direct, zero-copy TCP tunnel. The proxy never re-encodes media chunks, preserving full 4K 60fps and 8K HDR throughput.
+          </p>
+          <p style="margin-bottom:0.5rem;">
+            2. <strong>Player API Sanitization:</strong> When your browser requests <code class="code-box">POST /youtubei/v1/player</code>, Sinkhole intercepts the response, deletes all ad cues, and returns the sanitized payload. YouTube's frontend player starts the video immediately with 0 ads scheduled.
+          </p>
+          <p>
+            3. <strong>Scriptlet Shield:</strong> Injects an in-browser defuser script that ensures dynamic SPA navigations stay ad-free.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 8: HTTPS & ROOT CA -->
+    <div id="view-https" class="view-container">
+      <div class="panel">
+        <div class="panel-title">Local Root Certificate Authority (CA)</div>
+        <div class="panel-sub">Inspect and filter HTTPS traffic across Chrome, Edge, Brave, and Firefox without browser security warnings.</div>
+        
+        <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:1rem; border-radius:8px; border:1px solid var(--card-border);">
+            <div>
+              <div style="font-weight:600;" id="caSubject">Sinkhole HTTPS Filtering Root CA</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);" id="caDetails">Checking certificate status...</div>
+            </div>
+            <span class="badge allowed" id="caTrustBadge">Checking...</span>
+          </div>
+
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="installRootCA()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Install & Trust in Windows Root Store
+            </button>
+            <button class="btn btn-secondary" onclick="downloadCACert()">Download .CRT File</button>
+            <button class="btn btn-danger btn-sm" onclick="uninstallRootCA()">Remove from Windows</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Windows 11 System Proxy & PAC Controller</div>
+        <div class="panel-sub">Direct all desktop browsers to the local inspection proxy (127.0.0.1:8080) with automatic local bypass.</div>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:1rem; border-radius:8px; border:1px solid var(--card-border); margin-top:1rem; margin-bottom:1rem;">
+          <div>
+            <div style="font-weight:600;" id="proxyStatusTitle">System Proxy Status</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);" id="proxyStatusDetails">Inspecting Windows proxy configuration...</div>
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <button class="btn btn-primary btn-sm" id="enableProxyBtn" onclick="enableSystemProxy()">Activate Proxy</button>
+            <button class="btn btn-secondary btn-sm" id="disableProxyBtn" onclick="disableSystemProxy()">Disable Proxy</button>
+          </div>
+        </div>
+
+        <div style="font-size:0.8rem; color:var(--text-muted);">
+          PAC Auto-Config URL: <a href="/proxy.pac" target="_blank" style="color:var(--accent-blue);">http://127.0.0.1:3000/proxy.pac</a> (Automatically excludes intranet, 192.168.*, and banking domains).
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 9: TRAFFIC & ELEMENT INSPECTOR -->
+    <div id="view-inspector" class="view-container">
+      <div class="panel">
+        <div class="panel-title">Add Cosmetic Element-Hiding Rule</div>
+        <div class="panel-sub">Block specific ad banners or clutter by CSS selector (AdBlock / uBlock Origin syntax).</div>
+        <form onsubmit="submitCosmeticRule(event)" style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.75rem;">
+          <input type="text" id="newCosmeticRuleInput" placeholder="example.com##.sponsor-banner or ##.global-ad" style="flex:1; min-width:300px;" required>
+          <button type="submit" class="btn btn-primary">+ Add Cosmetic Rule</button>
+        </form>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem;">
+          Active in-page cosmetic rules loaded: <strong style="color:var(--accent-blue);" id="cosmeticRulesCount">0</strong>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <div class="table-toolbar">
+          <div>
+            <strong>Real-Time HTTP/HTTPS Decrypted Traffic Stream</strong>
+          </div>
+          <div class="input-group">
+            <button class="btn btn-secondary btn-sm" onclick="clearInspectorStream()">Clear Stream</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Method</th>
+              <th>Host</th>
+              <th>Path</th>
+              <th>Action</th>
+              <th>Inspection Details</th>
+              <th>Client</th>
+            </tr>
+          </thead>
+          <tbody id="inspectorTableBody">
+            <tr><td colspan="7" style="text-align:center; color:var(--text-muted)">Waiting for HTTP/HTTPS proxy traffic...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </main>
 
   <div id="toast" class="toast">Action completed</div>
@@ -992,6 +1158,7 @@
     let sseSource = null;
     let logPaused = false;
     let rawQueryLogs = [];
+    let rawInspectorLogs = [];
     let serverConfig = null;
 
     const views = {
@@ -999,6 +1166,9 @@
       querylog: { title: 'Live Query Log', desc: 'Real-time log of DNS queries with domain, client IP, latency, and status.' },
       blocklists: { title: 'Blocklist Subscriptions', desc: 'Manage remote ad/tracker blocklists and update schedules.' },
       rules: { title: 'Custom Whitelist & Blacklist', desc: 'Override domains manually with wildcard and subdomain support.' },
+      youtube: { title: 'YouTube Shield & Stream Protection', desc: 'Deep interception of YouTube video player payloads and cosmetic ad defusal.' },
+      https: { title: 'HTTPS Inspection & Root Certificate Authority', desc: 'Manage Windows Root CA trust and transparent proxy settings for deep browser filtering.' },
+      inspector: { title: 'HTTP/HTTPS Traffic & Element Inspector', desc: 'Real-time log of decrypted requests, sanitized video payloads, and injected cosmetic rules.' },
       settings: { title: 'DNS & Upstream Settings', desc: 'Configure upstream DNS-over-HTTPS/UDP resolvers and caching.' },
       network: { title: 'Adapters & Home Router Guide', desc: 'Configure local Windows 11 adapters and home router DHCP distribution.' }
     };
@@ -1034,6 +1204,9 @@
       if (currentView === 'querylog') fetchQueryLog();
       if (currentView === 'blocklists') fetchBlocklists();
       if (currentView === 'rules') fetchRules();
+      if (currentView === 'youtube') fetchYouTubeConfig();
+      if (currentView === 'https') { fetchCAStatus(); fetchProxyStatus(); }
+      if (currentView === 'inspector') fetchCosmeticRules();
       if (currentView === 'settings') fetchSettings();
       if (currentView === 'network') fetchAdapters();
     }
@@ -1511,6 +1684,178 @@
       }
     }
 
+    // YouTube Shield
+    async function fetchYouTubeConfig() {
+      try {
+        const c = await api('/api/youtube');
+        document.getElementById('ytEnableToggle').checked = c.enabled;
+        document.getElementById('ytPrerollsToggle').checked = c.block_prerolls;
+        document.getElementById('ytBannersToggle').checked = c.block_banners;
+        document.getElementById('ytShortsToggle').checked = c.block_shorts;
+      } catch (err) {
+        console.error('YouTube config error', err);
+      }
+    }
+
+    async function saveYouTubeConfig() {
+      const payload = {
+        enabled: document.getElementById('ytEnableToggle').checked,
+        block_prerolls: document.getElementById('ytPrerollsToggle').checked,
+        block_banners: document.getElementById('ytBannersToggle').checked,
+        block_shorts: document.getElementById('ytShortsToggle').checked
+      };
+      try {
+        await api('/api/youtube', { method: 'PUT', body: JSON.stringify(payload) });
+        showToast('YouTube Shield configuration saved');
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    // HTTPS & Root CA
+    async function fetchCAStatus() {
+      try {
+        const c = await api('/api/ca/status');
+        const badge = document.getElementById('caTrustBadge');
+        if (c.trusted) {
+          badge.className = 'badge allowed';
+          badge.textContent = 'Trusted in Windows Store';
+        } else {
+          badge.className = 'badge error';
+          badge.textContent = 'Not Trusted / Pending Install';
+        }
+        document.getElementById('caSubject').textContent = c.subject || 'Sinkhole Local CA';
+        const expStr = c.expires ? new Date(c.expires).toLocaleDateString() : 'Unknown';
+        document.getElementById('caDetails').textContent = `Status: ${c.trusted ? 'Active' : 'Unregistered'} | Expires: ${expStr} | Path: ${c.cert_path}`;
+      } catch (err) {
+        console.error('CA status error', err);
+      }
+    }
+
+    async function installRootCA() {
+      try {
+        showToast('Installing Root CA into Windows Certificate Store...');
+        const res = await api('/api/ca/install', { method: 'POST' });
+        if (res.trusted) {
+          showToast('Root CA successfully installed & trusted in Windows!');
+        } else {
+          showToast('Certificate added to store');
+        }
+        fetchCAStatus();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function uninstallRootCA() {
+      if (!confirm('Remove Sinkhole Root CA from Windows certificate store?')) return;
+      try {
+        await api('/api/ca/uninstall', { method: 'POST' });
+        showToast('Root CA removed from Windows');
+        fetchCAStatus();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    function downloadCACert() {
+      window.open('/api/ca/cert', '_blank');
+    }
+
+    // Windows System Proxy
+    async function fetchProxyStatus() {
+      try {
+        const p = await api('/api/proxy/status');
+        const isEnabled = p.system_proxy && p.system_proxy.enabled;
+        document.getElementById('proxyStatusTitle').textContent = isEnabled ?
+          'Windows System Proxy: ACTIVE' : 'Windows System Proxy: DISABLED';
+        document.getElementById('proxyStatusTitle').style.color = isEnabled ? 'var(--accent-green)' : 'var(--text-muted)';
+        document.getElementById('proxyStatusDetails').textContent = isEnabled ?
+          `Browser traffic routing through proxy at ${p.proxy_listen} (AutoConfig: ${p.system_proxy.auto_config_url || 'None'})` :
+          'Direct internet connection active. Click Activate to route browser traffic through Sinkhole.';
+      } catch (err) {
+        console.error('Proxy status error', err);
+      }
+    }
+
+    async function enableSystemProxy() {
+      try {
+        await api('/api/proxy/enable', { method: 'POST' });
+        showToast('Windows System Proxy enabled');
+        fetchProxyStatus();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function disableSystemProxy() {
+      try {
+        await api('/api/proxy/disable', { method: 'POST' });
+        showToast('Windows System Proxy disabled');
+        fetchProxyStatus();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    // Cosmetic Rules & Inspector
+    async function fetchCosmeticRules() {
+      try {
+        const c = await api('/api/cosmetic/rules');
+        document.getElementById('cosmeticRulesCount').textContent = c.rule_count || 0;
+      } catch (err) {
+        console.error('Cosmetic rules count error', err);
+      }
+    }
+
+    async function submitCosmeticRule(e) {
+      e.preventDefault();
+      const rule = document.getElementById('newCosmeticRuleInput').value.trim();
+      if (!rule) return;
+      try {
+        await api('/api/cosmetic/rules', { method: 'POST', body: JSON.stringify({ rule }) });
+        document.getElementById('newCosmeticRuleInput').value = '';
+        showToast('Cosmetic element hiding rule added');
+        fetchCosmeticRules();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    function renderInspectorTable(events) {
+      const tbody = document.getElementById('inspectorTableBody');
+      if (!events || events.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">No proxy transactions recorded yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = events.map(ev => {
+        const timeStr = new Date(ev.ts).toLocaleTimeString();
+        let badgeClass = 'cached';
+        if (ev.action === 'modified') badgeClass = 'allowed';
+        if (ev.action === 'blocked') badgeClass = 'blocked';
+        if (ev.action === 'injected') badgeClass = 'cached';
+        if (ev.action === 'tunneled') badgeClass = 'error';
+
+        return `
+          <tr>
+            <td style="color:var(--text-muted); font-size:0.75rem">${timeStr}</td>
+            <td><span style="font-weight:600;font-size:0.75rem;">${ev.method}</span></td>
+            <td><strong>${ev.host}</strong></td>
+            <td style="font-family:monospace; font-size:0.75rem; color:var(--text-muted); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${ev.path}</td>
+            <td><span class="badge ${badgeClass}">${ev.action}</span></td>
+            <td style="font-size:0.8rem">${ev.details}</td>
+            <td><code style="color:var(--accent-cyan); font-size:0.75rem">${ev.client_ip || '127.0.0.1'}</code></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function clearInspectorStream() {
+      rawInspectorLogs = [];
+      renderInspectorTable([]);
+      showToast('Inspector stream cleared');
+    }
+
     // SSE Setup
     function setupSSE() {
       if (sseSource) sseSource.close();
@@ -1529,6 +1874,12 @@
             rawQueryLogs = [...data.queries.reverse(), ...rawQueryLogs].slice(0, 200);
             if (currentView === 'querylog') {
               filterQueryLog();
+            }
+          }
+          if (data.events && data.events.length > 0) {
+            rawInspectorLogs = [...data.events.reverse(), ...rawInspectorLogs].slice(0, 150);
+            if (currentView === 'inspector') {
+              renderInspectorTable(rawInspectorLogs);
             }
           }
         } catch (err) {

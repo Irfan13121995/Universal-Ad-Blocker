@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"sinkhole/src/server/proxy"
 	"sinkhole/src/server/stats"
 	"sinkhole/src/store"
 )
@@ -17,9 +18,10 @@ import (
 type Hub struct {
 	stats *stats.Stats
 
-	mu   sync.Mutex
-	subs map[chan []byte]struct{}
-	buf  []store.QueryEntry
+	mu       sync.Mutex
+	subs     map[chan []byte]struct{}
+	buf      []store.QueryEntry
+	eventBuf []proxy.InspectorEvent
 }
 
 // NewHub creates a hub.
@@ -36,9 +38,19 @@ func (h *Hub) Publish(e store.QueryEntry) {
 	h.mu.Unlock()
 }
 
+// PublishEvent enqueues a proxy HTTP inspection event for live streaming.
+func (h *Hub) PublishEvent(e proxy.InspectorEvent) {
+	h.mu.Lock()
+	if len(h.subs) > 0 && len(h.eventBuf) < 200 {
+		h.eventBuf = append(h.eventBuf, e)
+	}
+	h.mu.Unlock()
+}
+
 type ssePayload struct {
-	Counters stats.Counters     `json:"counters"`
-	Queries  []store.QueryEntry `json:"queries"`
+	Counters stats.Counters         `json:"counters"`
+	Queries  []store.QueryEntry     `json:"queries"`
+	Events   []proxy.InspectorEvent `json:"events,omitempty"`
 }
 
 // Run broadcasts every second until ctx is done.
@@ -54,11 +66,13 @@ func (h *Hub) Run(ctx context.Context) {
 		h.mu.Lock()
 		if len(h.subs) == 0 {
 			h.buf = h.buf[:0]
+			h.eventBuf = h.eventBuf[:0]
 			h.mu.Unlock()
 			continue
 		}
-		p := ssePayload{Counters: h.stats.Counters(), Queries: h.buf}
+		p := ssePayload{Counters: h.stats.Counters(), Queries: h.buf, Events: h.eventBuf}
 		h.buf = nil
+		h.eventBuf = nil
 		b, err := json.Marshal(p)
 		if err == nil {
 			for ch := range h.subs {
