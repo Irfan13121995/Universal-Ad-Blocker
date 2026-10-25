@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"sinkhole/src/app"
@@ -126,7 +127,13 @@ func runInteractive(dataDir string, debug bool) {
 	cfg := application.GetConfig()
 	fmt.Println("----------------------------------------------------------------")
 	fmt.Printf("✓ DNS Server active on: %v (UDP & TCP)\n", cfg.DNSListen)
-	fmt.Printf("✓ Admin Dashboard:     http://%s\n", cfg.WebListen)
+	webDisplay := cfg.WebListen
+	if strings.HasPrefix(webDisplay, "0.0.0.0:") {
+		webDisplay = "http://127.0.0.1:" + strings.TrimPrefix(webDisplay, "0.0.0.0:")
+	} else if !strings.HasPrefix(webDisplay, "http://") && !strings.HasPrefix(webDisplay, "https://") {
+		webDisplay = "http://" + webDisplay
+	}
+	fmt.Printf("✓ Admin Dashboard:     %s\n", webDisplay)
 	fmt.Printf("✓ Press Ctrl+C to shut down cleanly.\n")
 	fmt.Println("----------------------------------------------------------------")
 

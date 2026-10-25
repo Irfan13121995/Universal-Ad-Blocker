@@ -82,6 +82,8 @@ class MainActivity : AppCompatActivity() {
                 databaseEnabled = true
                 allowFileAccess = true
                 allowContentAccess = true
+                allowFileAccessFromFileURLs = true
+                allowUniversalAccessFromFileURLs = true
                 cacheMode = WebSettings.LOAD_DEFAULT
                 useWideViewPort = true
                 loadWithOverviewMode = true
@@ -108,11 +110,11 @@ class MainActivity : AppCompatActivity() {
                     
                     // Keep app URLs inside WebView
                     if (url.startsWith("file:///android_asset") ||
-                        url.contains("localhost:3002") ||
-                        url.contains("127.0.0.1:3002") ||
-                        url.contains("10.0.2.2:3002") ||
-                        url.matches(Regex("https?://192\\.168\\.\\d+\\.\\d+(:\\d+)?.*")) ||
-                        url.matches(Regex("https?://10\\.\\d+\\.\\d+\\.\\d+(:\\d+)?.*"))
+                        url.contains(":3002") ||
+                        url.contains("localhost") ||
+                        url.contains("127.0.0.1") ||
+                        url.contains("10.0.2.2") ||
+                        url.matches(Regex("https?://(192\\.168|10\\.|172\\.(1[6-9]|2[0-9]|3[0-1]))\\..*"))
                     ) {
                         return false
                     }

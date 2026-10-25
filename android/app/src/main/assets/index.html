@@ -1303,7 +1303,7 @@
       <div class="topbar-actions">
         <!-- Server chip for mobile -->
         <div class="server-pill" onclick="openServerModal()" title="Change Sinkhole Server Target">
-          <span style="width:6px; height:6px; border-radius:50%; background:var(--apple-green);"></span>
+          <span id="topbarStatusDot" style="width:6px; height:6px; border-radius:50%; background:var(--apple-green);"></span>
           <span id="topbarServerIp">3002</span>
         </div>
 
@@ -1889,13 +1889,14 @@
       <div class="form-row">
         <label>Server Base URL</label>
         <input type="text" id="customServerInput" placeholder="http://192.168.1.100:3002">
-        <div class="form-help">Default: local host or origin server.</div>
+        <div class="form-help">Enter your Windows 11 PC's local IP address on Wi-Fi.</div>
+        <div id="lanSubnetHint" style="font-size:0.75rem; color:var(--apple-blue); margin-top:0.35rem; display:none;"></div>
       </div>
 
       <div style="display:flex; gap:0.5rem; margin-bottom:1.25rem; flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://127.0.0.1:3002')">127.0.0.1:3002</button>
+        <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://192.168.68.56:3002')">Current PC (192.168.68.56)</button>
         <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://10.0.2.2:3002')">10.0.2.2 (Emulator)</button>
-        <button class="btn btn-secondary btn-sm" onclick="useCurrentOrigin()">Use Origin</button>
+        <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://127.0.0.1:3002')">127.0.0.1:3002</button>
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -2023,9 +2024,30 @@
 
     function openServerModal() {
       triggerHaptic('click');
-      document.getElementById('customServerInput').value = serverBaseUrl || window.location.origin;
+      const isFile = window.location.protocol === 'file:';
+      let currentVal = serverBaseUrl;
+      if (!currentVal && !isFile && window.location.origin) {
+        currentVal = window.location.origin;
+      }
+      document.getElementById('customServerInput').value = currentVal || '';
       document.getElementById('serverModal').classList.add('active');
       document.getElementById('serverTestFeedback').style.display = 'none';
+
+      // Check device LAN info via AndroidBridge
+      const a = window.Android || window.AndroidBridge;
+      if (a && typeof a.getDeviceLANInfo === 'function') {
+        try {
+          const info = JSON.parse(a.getDeviceLANInfo());
+          if (info.ip && info.ip !== '127.0.0.1') {
+            const subnet = info.ip.substring(0, info.ip.lastIndexOf('.'));
+            const hint = document.getElementById('lanSubnetHint');
+            if (hint) {
+              hint.textContent = `Phone IP: ${info.ip} · PC is likely http://${subnet}.56:3002`;
+              hint.style.display = 'block';
+            }
+          }
+        } catch (e) {}
+      }
     }
 
     function closeServerModal(e) {
@@ -2037,16 +2059,26 @@
     }
 
     function useCurrentOrigin() {
-      document.getElementById('customServerInput').value = window.location.origin;
+      if (window.location.protocol !== 'file:') {
+        document.getElementById('customServerInput').value = window.location.origin;
+      } else {
+        document.getElementById('customServerInput').value = 'http://192.168.68.56:3002';
+      }
     }
 
     async function testServerConnection() {
-      const url = document.getElementById('customServerInput').value.trim();
+      let url = document.getElementById('customServerInput').value.trim();
       const fb = document.getElementById('serverTestFeedback');
       fb.style.display = 'block';
-      fb.textContent = 'Testing connection...';
+      if (!url || url.startsWith('file:')) {
+        fb.innerHTML = '<span style="color:var(--apple-red)">Please enter a valid HTTP address (e.g. http://192.168.68.56:3002)</span>';
+        return;
+      }
+      if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+      fb.textContent = 'Testing connection to ' + url + '...';
       try {
-        const res = await fetch((url.replace(/\/+$/, '')) + '/api/status', {
+        const target = url.replace(/\/+$/, '') + '/api/status';
+        const res = await fetch(target, {
           headers: { 'X-Sinkhole': '1' }
         });
         if (res.ok) {
@@ -2056,33 +2088,58 @@
           fb.innerHTML = `<span style="color:var(--apple-red)">Failed: HTTP ${res.status}</span>`;
         }
       } catch (err) {
-        fb.innerHTML = `<span style="color:var(--apple-red)">Error: ${err.message}</span>`;
+        fb.innerHTML = `<span style="color:var(--apple-red)">Error: Cannot reach server. Verify PC is running and on same Wi-Fi.</span>`;
       }
     }
 
     function saveServerUrl() {
-      const input = document.getElementById('customServerInput').value.trim();
-      if (input === window.location.origin || !input) {
+      let input = document.getElementById('customServerInput').value.trim();
+      if (!input || input.startsWith('file:') || input === 'file://') {
         serverBaseUrl = '';
         localStorage.removeItem('sinkhole_server_url');
       } else {
-        serverBaseUrl = input;
-        localStorage.setItem('sinkhole_server_url', input);
+        if (!/^https?:\/\//i.test(input)) {
+          input = 'http://' + input;
+        }
+        try {
+          const u = new URL(input);
+          if (!u.port) {
+            u.port = '3002';
+            input = u.toString().replace(/\/+$/, '');
+          }
+        } catch (e) {}
+        serverBaseUrl = input.replace(/\/+$/, '');
+        localStorage.setItem('sinkhole_server_url', serverBaseUrl);
       }
-      if (window.Android && typeof window.Android.saveServerUrl === 'function') {
-        window.Android.saveServerUrl(serverBaseUrl);
+      const a = window.Android || window.AndroidBridge;
+      if (a && typeof a.saveServerUrl === 'function') {
+        a.saveServerUrl(serverBaseUrl);
       }
       updateServerLabels();
       closeServerModal();
-      showToast('Server connection target updated');
+      showToast(serverBaseUrl ? 'Connected to ' + serverBaseUrl : 'Disconnected from custom server');
       refreshCurrentView();
       setupSSE();
     }
 
     function updateServerLabels() {
-      const display = serverBaseUrl ? serverBaseUrl.replace(/^https?:\/\//, '') : (window.location.host || '127.0.0.1:3002');
-      document.getElementById('currentServerLabel').textContent = display;
-      document.getElementById('topbarServerIp').textContent = display.split(':')[0] || '3002';
+      const isFile = window.location.protocol === 'file:';
+      const isConnected = Boolean(serverBaseUrl) || !isFile;
+
+      const dotEl = document.getElementById('topbarStatusDot');
+      const ipEl = document.getElementById('topbarServerIp');
+      const sideLabelEl = document.getElementById('currentServerLabel');
+
+      if (!isConnected) {
+        if (dotEl) dotEl.style.background = 'var(--apple-orange)';
+        if (ipEl) ipEl.textContent = 'Connect Server';
+        if (sideLabelEl) sideLabelEl.textContent = 'Not Connected';
+      } else {
+        const display = serverBaseUrl ? serverBaseUrl.replace(/^https?:\/\//, '') : (window.location.host || '127.0.0.1:3002');
+        if (dotEl) dotEl.style.background = 'var(--apple-green)';
+        if (ipEl) ipEl.textContent = display.split(':')[0] || '3002';
+        if (sideLabelEl) sideLabelEl.textContent = display;
+      }
     }
 
     // -------------------------------------------------------------
@@ -2145,18 +2202,29 @@
     // API CALL HELPER
     // -------------------------------------------------------------
     async function api(path, options = {}) {
+      const isFile = window.location.protocol === 'file:';
+      if (!serverBaseUrl && isFile) {
+        throw new Error('Not connected to Sinkhole server. Tap "Connect Server" above.');
+      }
       options.headers = {
         'Content-Type': 'application/json',
         'X-Sinkhole': '1',
         ...(options.headers || {})
       };
       const url = getApiUrl(path);
-      const res = await fetch(url, options);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(err.error || `HTTP ${res.status}`);
+      try {
+        const res = await fetch(url, options);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: res.statusText }));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+      } catch (err) {
+        if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+          throw new Error(`Cannot reach Sinkhole server at ${serverBaseUrl || window.location.origin}. Check Wi-Fi & PC IP.`);
+        }
+        throw err;
       }
-      return res.json();
     }
 
     // -------------------------------------------------------------
@@ -2184,10 +2252,18 @@
 
     async function toggleProtection(enabled) {
       triggerHaptic('click');
+      const isFile = window.location.protocol === 'file:';
+      if (!serverBaseUrl && isFile) {
+        document.getElementById('protectionToggle').checked = !enabled;
+        showToast('Please connect to your Sinkhole server first', true);
+        openServerModal();
+        return;
+      }
       try {
         await api('/api/protection', { method: 'POST', body: JSON.stringify({ enabled }) });
         showToast(`Sinkhole Protection ${enabled ? 'Enabled' : 'Disabled'}`);
       } catch (err) {
+        document.getElementById('protectionToggle').checked = !enabled;
         showToast(err.message, true);
       }
     }
@@ -2900,14 +2976,24 @@
     // Init
     window.addEventListener('DOMContentLoaded', () => {
       // Check if native Android bridge provides saved server url
-      if (window.Android && typeof window.Android.getServerUrl === 'function') {
-        const saved = window.Android.getServerUrl();
+      const a = window.Android || window.AndroidBridge;
+      if (a && typeof a.getServerUrl === 'function') {
+        const saved = a.getServerUrl();
         if (saved) serverBaseUrl = saved;
       }
       updateServerLabels();
-      fetchStatus();
-      fetchStats();
-      setupSSE();
+
+      const isFile = window.location.protocol === 'file:';
+      if (!serverBaseUrl && isFile) {
+        // Automatically prompt the user on first launch to connect to their Windows PC
+        setTimeout(() => {
+          openServerModal();
+        }, 350);
+      } else {
+        fetchStatus();
+        fetchStats();
+        setupSSE();
+      }
     });
   </script>
 </body>

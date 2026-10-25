@@ -162,7 +162,26 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "no-referrer")
-		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'")
+		h.Set("Content-Security-Policy", "default-src 'self' http: https: data:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src *")
+
+		// CORS support for mobile app (WebView, PWA, LAN clients)
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			h.Set("Access-Control-Allow-Origin", origin)
+			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+			h.Set("Access-Control-Allow-Headers", "Content-Type, X-Sinkhole, Authorization")
+			h.Set("Access-Control-Allow-Credentials", "true")
+		} else {
+			h.Set("Access-Control-Allow-Origin", "*")
+			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+			h.Set("Access-Control-Allow-Headers", "Content-Type, X-Sinkhole, Authorization")
+		}
+
+		// Handle preflight OPTIONS requests immediately
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 
 		// DNS-rebinding protection: only accept IP literals / local names.
 		if !s.allowedHost(r.Host) {
@@ -817,7 +836,11 @@ func (s *Server) proxyEnable(w http.ResponseWriter, r *http.Request) {
 		host = "127.0.0.1"
 	}
 	proxyAddr := net.JoinHostPort(host, port)
-	pacURL := "http://" + cfg.WebListen + "/proxy.pac"
+	webHost, webPort, _ := net.SplitHostPort(cfg.WebListen)
+	if webHost == "" || webHost == "0.0.0.0" {
+		webHost = "127.0.0.1"
+	}
+	pacURL := "http://" + net.JoinHostPort(webHost, webPort) + "/proxy.pac"
 	if err := system.EnableSystemProxy(proxyAddr, pacURL); err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
