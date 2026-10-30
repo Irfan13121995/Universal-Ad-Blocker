@@ -18,6 +18,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -881,15 +883,22 @@ func (s *Server) getYoutubeHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) postYoutubeSetup(w http.ResponseWriter, r *http.Request) {
-	// 1. Install & trust CA if not already trusted
-	if s.d.CA != nil && !s.d.CA.IsTrusted() {
-		if err := s.d.CA.InstallWindowsRoot(); err != nil {
-			s.d.Log.Warn("auto-install Root CA error", "err", err)
-		}
+	// 1. Ensure YouTube shield is enabled in configuration
+	cfg := s.d.Config()
+	cfg.YouTubeShield.Enabled = true
+	if _, err := s.d.ApplyConfig(cfg); err != nil {
+		s.d.Log.Warn("apply config error during youtube setup", "err", err)
+	}
+	if s.d.Proxy != nil {
+		s.d.Proxy.SetYouTubeShield(content.YouTubeShield{
+			Enabled:       true,
+			BlockPrerolls: cfg.YouTubeShield.BlockPrerolls,
+			BlockBanners:  cfg.YouTubeShield.BlockBanners,
+			BlockShorts:   cfg.YouTubeShield.BlockShorts,
+		})
 	}
 
-	// 2. Enable Windows proxy
-	cfg := s.d.Config()
+	// 2. Immediate non-elevated proxy configuration in HKCU
 	host, port, _ := net.SplitHostPort(cfg.ProxyListen)
 	if host == "" || host == "0.0.0.0" {
 		host = "127.0.0.1"
@@ -899,19 +908,75 @@ func (s *Server) postYoutubeSetup(w http.ResponseWriter, r *http.Request) {
 		s.d.Log.Warn("enable system proxy error", "err", err)
 	}
 
-	// 3. Block QUIC (UDP 443) outbound
-	if err := system.SetQUICBlocked(true); err != nil {
-		s.d.Log.Warn("block QUIC firewall error", "err", err)
+	// 3. Resolve path to Enable-YouTubeShield.ps1
+	scriptPath := filepath.Join(os.Getenv("ProgramData"), "Sinkhole", "scripts", "Enable-YouTubeShield.ps1")
+	if _, err := os.Stat(scriptPath); err != nil {
+		if abs, err := filepath.Abs("scripts/Enable-YouTubeShield.ps1"); err == nil {
+			if _, err := os.Stat(abs); err == nil {
+				scriptPath = abs
+			}
+		}
 	}
 
-	// 4. Return new health status
-	s.getYoutubeHealth(w, r)
+	uacLaunched := false
+	if _, err := os.Stat(scriptPath); err == nil {
+		// Launch elevated process asynchronously without blocking HTTP request
+		cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+			fmt.Sprintf(`Start-Process powershell.exe -Verb RunAs -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File "%s"'`, scriptPath),
+		)
+		if err := cmd.Start(); err == nil {
+			uacLaunched = true
+			go func() { _ = cmd.Wait() }()
+		} else {
+			s.d.Log.Warn("failed to launch elevated youtube setup script", "err", err)
+		}
+	} else {
+		// Fallback: direct in-process attempts
+		if s.d.CA != nil && !s.d.CA.IsTrusted() {
+			_ = s.d.CA.InstallWindowsRoot()
+		}
+		_ = system.SetQUICBlocked(true)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":           true,
+		"uac_launched": uacLaunched,
+		"message":      "1-Click YouTube Shield setup initiated. Accept the Windows UAC elevation prompt if shown.",
+	})
 }
 
 func (s *Server) postYoutubeTeardown(w http.ResponseWriter, r *http.Request) {
 	_ = system.DisableSystemProxy()
-	_ = system.SetQUICBlocked(false)
-	s.getYoutubeHealth(w, r)
+
+	scriptPath := filepath.Join(os.Getenv("ProgramData"), "Sinkhole", "scripts", "Disable-YouTubeShield.ps1")
+	if _, err := os.Stat(scriptPath); err != nil {
+		if abs, err := filepath.Abs("scripts/Disable-YouTubeShield.ps1"); err == nil {
+			if _, err := os.Stat(abs); err == nil {
+				scriptPath = abs
+			}
+		}
+	}
+
+	uacLaunched := false
+	if _, err := os.Stat(scriptPath); err == nil {
+		cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+			fmt.Sprintf(`Start-Process powershell.exe -Verb RunAs -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File "%s"'`, scriptPath),
+		)
+		if err := cmd.Start(); err == nil {
+			uacLaunched = true
+			go func() { _ = cmd.Wait() }()
+		} else {
+			s.d.Log.Warn("failed to launch elevated youtube teardown script", "err", err)
+		}
+	} else {
+		_ = system.SetQUICBlocked(false)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":           true,
+		"uac_launched": uacLaunched,
+		"message":      "YouTube Shield teardown initiated.",
+	})
 }
 
 func (s *Server) putYoutube(w http.ResponseWriter, r *http.Request) {

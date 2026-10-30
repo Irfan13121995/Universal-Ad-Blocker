@@ -29,6 +29,14 @@ Write-Host "  Activating Sinkhole YouTube Shield & System Proxy    " -Foreground
 Write-Host "=======================================================" -ForegroundColor Cyan
 
 # 1. Install & Trust Root CA
+if (-not (Test-Path $CertPath)) {
+    # Check alternate locations (workspace or cwd)
+    $localCert = Join-Path $PSScriptRoot "..\certs\sinkhole_ca.crt"
+    if (Test-Path $localCert) {
+        $CertPath = (Resolve-Path $localCert).Path
+    }
+}
+
 if (Test-Path $CertPath) {
     Write-Host "[1/4] Installing Sinkhole Root CA into Windows Certificate Store..." -ForegroundColor Yellow
     certutil.exe -addstore -user -f "Root" $CertPath | Out-Null
@@ -85,7 +93,17 @@ New-NetFirewallRule -DisplayName $ruleProxyIn `
     -Profile Any `
     -Description "Allows incoming HTTP/HTTPS proxy connections to Sinkhole." | Out-Null
 
-Write-Host "✓ Firewall rules applied: Outbound QUIC blocked, Inbound Proxy port 8080 open" -ForegroundColor Green
+$ruleWebIn = "Sinkhole Web Dashboard (TCP Inbound 3002)"
+Remove-NetFirewallRule -DisplayName $ruleWebIn -ErrorAction SilentlyContinue
+New-NetFirewallRule -DisplayName $ruleWebIn `
+    -Direction Inbound `
+    -Protocol TCP `
+    -LocalPort 3002 `
+    -Action Allow `
+    -Profile Any `
+    -Description "Allows incoming HTTP connections to Sinkhole Web Dashboard." | Out-Null
+
+Write-Host "✓ Firewall rules applied: Outbound QUIC blocked, Inbound Proxy (8080) and Dashboard (3002) open" -ForegroundColor Green
 
 # Clear Windows DNS Cache
 Clear-DnsClientCache -ErrorAction SilentlyContinue

@@ -1948,15 +1948,19 @@
       
       <div class="form-row">
         <label>Server Base URL</label>
-        <input type="text" id="customServerInput" placeholder="http://192.168.1.100:3002">
-        <div class="form-help">Enter your Windows 11 PC's local IP address on Wi-Fi.</div>
+        <input type="text" id="customServerInput" placeholder="http://192.168.68.51:3002">
+        <div class="form-help">Enter your Windows 11 PC's local IP address on Wi-Fi (port 3002).</div>
         <div id="lanSubnetHint" style="font-size:0.75rem; color:var(--apple-blue); margin-top:0.35rem; display:none;"></div>
       </div>
 
+      <div style="background:rgba(255,159,10,0.1); border:1px solid rgba(255,159,10,0.25); border-radius:var(--radius-sm); padding:0.6rem 0.8rem; margin-bottom:1rem; font-size:0.78rem; color:var(--text-secondary);">
+        <strong style="color:var(--apple-orange)">💡 Mobile / Android Notice:</strong> To control Sinkhole from your phone, connect to your PC's Wi-Fi IP (e.g. <code>http://192.168.68.51:3002</code>). Do not use <code>127.0.0.1</code> on your phone.
+      </div>
+
       <div style="display:flex; gap:0.5rem; margin-bottom:1.25rem; flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://192.168.68.56:3002')">Current PC (192.168.68.56)</button>
+        <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://192.168.68.51:3002')">PC Wi-Fi (192.168.68.51:3002)</button>
         <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://10.0.2.2:3002')">10.0.2.2 (Emulator)</button>
-        <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://127.0.0.1:3002')">127.0.0.1:3002</button>
+        <button class="btn btn-secondary btn-sm" onclick="setQuickServer('http://127.0.0.1:3002')">127.0.0.1:3002 (PC Only)</button>
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -2102,7 +2106,7 @@
             const subnet = info.ip.substring(0, info.ip.lastIndexOf('.'));
             const hint = document.getElementById('lanSubnetHint');
             if (hint) {
-              hint.textContent = `Phone IP: ${info.ip} · PC is likely http://${subnet}.56:3002`;
+              hint.textContent = `Phone IP: ${info.ip} · PC is likely http://${subnet}.51:3002`;
               hint.style.display = 'block';
             }
           }
@@ -2122,7 +2126,7 @@
       if (window.location.protocol !== 'file:') {
         document.getElementById('customServerInput').value = window.location.origin;
       } else {
-        document.getElementById('customServerInput').value = 'http://192.168.68.56:3002';
+        document.getElementById('customServerInput').value = 'http://192.168.68.51:3002';
       }
     }
 
@@ -2131,7 +2135,7 @@
       const fb = document.getElementById('serverTestFeedback');
       fb.style.display = 'block';
       if (!url || url.startsWith('file:')) {
-        fb.innerHTML = '<span style="color:var(--apple-red)">Please enter a valid HTTP address (e.g. http://192.168.68.56:3002)</span>';
+        fb.innerHTML = '<span style="color:var(--apple-red)">Please enter a valid HTTP address (e.g. http://192.168.68.51:3002)</span>';
         return;
       }
       if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
@@ -2148,7 +2152,7 @@
           fb.innerHTML = `<span style="color:var(--apple-red)">Failed: HTTP ${res.status}</span>`;
         }
       } catch (err) {
-        fb.innerHTML = `<span style="color:var(--apple-red)">Error: Cannot reach server. Verify PC is running and on same Wi-Fi.</span>`;
+        fb.innerHTML = `<span style="color:var(--apple-red)">Error: Cannot reach server. Verify PC is running sinkhole.exe and on same Wi-Fi.</span>`;
       }
     }
 
@@ -2184,7 +2188,10 @@
 
     function updateServerLabels() {
       const isFile = window.location.protocol === 'file:';
-      const isConnected = Boolean(serverBaseUrl) || !isFile;
+      const isAndroid = Boolean(window.Android || window.AndroidBridge);
+      const isConnected = isFile
+        ? (Boolean(serverBaseUrl) && (!isAndroid || !/127\.0\.0\.1|localhost/i.test(serverBaseUrl)))
+        : true;
 
       const dotEl = document.getElementById('topbarStatusDot');
       const ipEl = document.getElementById('topbarServerIp');
@@ -2263,8 +2270,9 @@
     // -------------------------------------------------------------
     async function api(path, options = {}) {
       const isFile = window.location.protocol === 'file:';
-      if (!serverBaseUrl && isFile) {
-        throw new Error('Not connected to Sinkhole server. Tap "Connect Server" above.');
+      const isAndroid = Boolean(window.Android || window.AndroidBridge);
+      if (isFile && (!serverBaseUrl || (isAndroid && /127\.0\.0\.1|localhost/i.test(serverBaseUrl)))) {
+        throw new Error('Not connected to PC server. Tap "Connect Server" above and enter your PC Wi-Fi IP (192.168.68.51:3002).');
       }
       options.headers = {
         'Content-Type': 'application/json',
@@ -2313,9 +2321,10 @@
     async function toggleProtection(enabled) {
       triggerHaptic('click');
       const isFile = window.location.protocol === 'file:';
-      if (!serverBaseUrl && isFile) {
+      const isAndroid = Boolean(window.Android || window.AndroidBridge);
+      if (isFile && (!serverBaseUrl || (isAndroid && /127\.0\.0\.1|localhost/i.test(serverBaseUrl)))) {
         document.getElementById('protectionToggle').checked = !enabled;
-        showToast('Please connect to your Sinkhole server first', true);
+        showToast('Connect to your PC server (e.g. 192.168.68.51) first', true);
         openServerModal();
         return;
       }
@@ -2906,30 +2915,93 @@
 
     async function setupYouTubeShield() {
       triggerHaptic('heavy');
-      showToast('Activating Root CA, System Proxy, and QUIC Firewall...');
+      const mainBtn = document.getElementById('yt1ClickSetupBtn');
+      if (mainBtn) {
+        mainBtn.disabled = true;
+        mainBtn.innerHTML = '<span class="badge-dot" style="background:#ff9f0a; display:inline-block; margin-right:6px;"></span> Requesting Windows elevation...';
+      }
+      showToast('Windows UAC prompt requested! Click "Yes" to complete 1-Click setup...');
+
       try {
-        const h = await api('/api/youtube/setup', { method: 'POST' });
-        renderYouTubeHealthWidgets(h);
-        fetchCAStatus();
-        fetchProxyStatus();
-        showToast('✓ YouTube Shield fully activated across all desktop browsers!');
+        const res = await api('/api/youtube/setup', { method: 'POST' });
+        if (res && res.uac_launched) {
+          showToast('Elevated setup active. Finalizing certificate trust & firewall...');
+        }
       } catch (err) {
         showToast('Setup error: ' + err.message, true);
+        if (mainBtn) {
+          mainBtn.disabled = false;
+          mainBtn.innerHTML = '⚡ 1-Click Activate Full YouTube Shield';
+        }
+        return;
       }
+
+      // Poll /api/youtube/health every 1s for up to 15 seconds
+      let attempts = 0;
+      const pollTimer = setInterval(async () => {
+        attempts++;
+        try {
+          const h = await api('/api/youtube/health');
+          renderYouTubeHealthWidgets(h);
+          if (h.all_healthy || (h.ca_trusted && h.proxy_enabled && h.quic_blocked)) {
+            clearInterval(pollTimer);
+            fetchCAStatus();
+            fetchProxyStatus();
+            showToast('✓ YouTube Shield fully activated across all desktop browsers!');
+            return;
+          }
+        } catch (e) {}
+
+        if (attempts >= 15) {
+          clearInterval(pollTimer);
+          fetchYouTubeHealth();
+          fetchCAStatus();
+          fetchProxyStatus();
+          if (mainBtn) mainBtn.disabled = false;
+          showToast('1-Click setup completed. Check indicators below.');
+        }
+      }, 1000);
     }
 
     async function teardownYouTubeShield() {
       triggerHaptic('click');
       if (!confirm('Disable YouTube system proxy and restore standard network settings?')) return;
+      const mainBtn = document.getElementById('yt1ClickSetupBtn');
+      if (mainBtn) {
+        mainBtn.disabled = true;
+        mainBtn.innerHTML = '<span class="badge-dot" style="background:#ff9f0a; display:inline-block; margin-right:6px;"></span> Reverting network settings...';
+      }
+      showToast('Reverting proxy and firewall rules...');
+
       try {
-        const h = await api('/api/youtube/teardown', { method: 'POST' });
-        renderYouTubeHealthWidgets(h);
-        fetchCAStatus();
-        fetchProxyStatus();
-        showToast('YouTube Shield and System Proxy deactivated.');
+        await api('/api/youtube/teardown', { method: 'POST' });
       } catch (err) {
         showToast(err.message, true);
       }
+
+      let attempts = 0;
+      const pollTimer = setInterval(async () => {
+        attempts++;
+        try {
+          const h = await api('/api/youtube/health');
+          renderYouTubeHealthWidgets(h);
+          if (!h.proxy_enabled && !h.quic_blocked) {
+            clearInterval(pollTimer);
+            fetchCAStatus();
+            fetchProxyStatus();
+            showToast('YouTube Shield and System Proxy deactivated.');
+            return;
+          }
+        } catch (e) {}
+
+        if (attempts >= 10) {
+          clearInterval(pollTimer);
+          fetchYouTubeHealth();
+          fetchCAStatus();
+          fetchProxyStatus();
+          if (mainBtn) mainBtn.disabled = false;
+        }
+      }, 1000);
     }
 
     // -------------------------------------------------------------
@@ -3134,7 +3206,8 @@
       updateServerLabels();
 
       const isFile = window.location.protocol === 'file:';
-      if (!serverBaseUrl && isFile) {
+      const isAndroid = Boolean(window.Android || window.AndroidBridge);
+      if (isFile && (!serverBaseUrl || (isAndroid && /127\.0\.0\.1|localhost/i.test(serverBaseUrl)))) {
         // Automatically prompt the user on first launch to connect to their Windows PC
         setTimeout(() => {
           openServerModal();
