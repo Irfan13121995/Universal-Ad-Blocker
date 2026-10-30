@@ -154,6 +154,7 @@ var DefaultBlocklists = []Blocklist{
 	{Name: "AdGuard DNS filter", URL: "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt", Enabled: true},
 	{Name: "StevenBlack Unified hosts", URL: "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts", Enabled: true},
 	{Name: "OISD Small", URL: "https://small.oisd.nl/", Enabled: true},
+	{Name: "Perflyst Smart-TV Blocklist (Samsung Tizen, Google TV, LG)", URL: "https://raw.githubusercontent.com/Perflyst/PiHoleBlocklist/master/SmartTV-AGH.txt", Enabled: true},
 	{Name: "EasyList (browser list, partial DNS coverage)", URL: "https://easylist.to/easylist/easylist.txt", Enabled: false},
 }
 

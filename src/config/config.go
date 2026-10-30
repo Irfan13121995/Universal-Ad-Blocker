@@ -47,9 +47,10 @@ type Config struct {
 	UpstreamTimeoutMs int      `json:"upstream_timeout_ms"`
 
 	// ProxyListen is the address of the local HTTPS inspection and YouTube filtering proxy.
-	ProxyListen        string        `json:"proxy_listen"`
-	HTTPSFiltering     bool          `json:"https_filtering"`
-	YouTubeShield      YouTubeConfig `json:"youtube_shield"`
+	ProxyListen    string         `json:"proxy_listen"`
+	HTTPSFiltering bool           `json:"https_filtering"`
+	YouTubeShield  YouTubeConfig  `json:"youtube_shield"`
+	TVShield       TVShieldConfig `json:"tv_shield"`
 
 	ProtectionEnabled bool   `json:"protection_enabled"`
 	BlockMode         string `json:"block_mode"`
@@ -76,18 +77,49 @@ type YouTubeConfig struct {
 	BlockShorts   bool `json:"block_shorts"`
 }
 
+// TVDeviceConfig stores a paired Smart TV (YouTube Lounge screen).
+type TVDeviceConfig struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	ScreenID    string `json:"screen_id"`
+	LoungeToken string `json:"lounge_token,omitempty"`
+	Platform    string `json:"platform,omitempty"` // e.g. "Samsung Tizen", "Google TV", "Smart TV"
+	IP          string `json:"ip,omitempty"`
+	Enabled     bool   `json:"enabled"`
+	AddedAt     int64  `json:"added_at,omitempty"`
+}
+
+// TVShieldConfig controls certificate-less Smart TV YouTube ad skipping, ad muting,
+// and SponsorBlock segment skipping via YouTube Lounge & SponsorBlock APIs.
+type TVShieldConfig struct {
+	Enabled      bool             `json:"enabled"`
+	SkipAds      bool             `json:"skip_ads"`
+	MuteAds      bool             `json:"mute_ads"`
+	SponsorBlock bool             `json:"sponsor_block"`
+	Categories   []string         `json:"categories"`
+	Devices      []TVDeviceConfig `json:"devices"`
+}
+
 // Default returns the configuration used on first start.
 func Default() Config {
 	return Config{
-		DNSListen: []string{"0.0.0.0:53", "[::]:53"},
-		WebListen: "0.0.0.0:3002",
-		ProxyListen: "127.0.0.1:8080",
+		DNSListen:      []string{"0.0.0.0:53", "[::]:53"},
+		WebListen:      "0.0.0.0:3002",
+		ProxyListen:    "127.0.0.1:8080",
 		HTTPSFiltering: true,
 		YouTubeShield: YouTubeConfig{
 			Enabled:       true,
 			BlockPrerolls: true,
 			BlockBanners:  true,
 			BlockShorts:   false,
+		},
+		TVShield: TVShieldConfig{
+			Enabled:      true,
+			SkipAds:      true,
+			MuteAds:      true,
+			SponsorBlock: true,
+			Categories:   []string{"sponsor", "selfpromo", "interaction"},
+			Devices:      []TVDeviceConfig{},
 		},
 		Upstreams: []string{
 			"https://cloudflare-dns.com/dns-query",
@@ -152,6 +184,14 @@ func (c *Config) Normalize() {
 	}
 	if c.UpdateIntervalHours < 0 {
 		c.UpdateIntervalHours = 0
+	}
+	if c.TVShield.Categories == nil {
+		c.TVShield.Categories = d.TVShield.Categories
+	} else {
+		c.TVShield.Categories = clean(c.TVShield.Categories)
+	}
+	if c.TVShield.Devices == nil {
+		c.TVShield.Devices = []TVDeviceConfig{}
 	}
 }
 

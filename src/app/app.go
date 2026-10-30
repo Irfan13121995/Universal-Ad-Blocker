@@ -18,6 +18,7 @@ import (
 	"sinkhole/src/server/filter"
 	"sinkhole/src/server/proxy"
 	"sinkhole/src/server/stats"
+	"sinkhole/src/server/tvshield"
 	"sinkhole/src/server/upstream"
 	"sinkhole/src/store"
 	"sinkhole/src/web"
@@ -43,6 +44,7 @@ type App struct {
 	caInstance *ca.CA
 	cosmetic   *content.CosmeticEngine
 	proxySrv   *proxy.Proxy
+	tvShield   *tvshield.Manager
 	hub        *web.Hub
 	webSrv     *web.Server
 	startedAt  time.Time
@@ -144,6 +146,19 @@ func New(dataDir string, version string, logger *slog.Logger) (*App, error) {
 	a.hub = web.NewHub(a.stats)
 	a.rec.SetPublisher(a.hub)
 
+	// Smart TV YouTube Lounge & SponsorBlock Shield
+	a.tvShield = tvshield.NewManager(logger, func(ev tvshield.TVEvent) {
+		a.hub.PublishEvent(proxy.InspectorEvent{
+			TS:       ev.TS,
+			Method:   "TV-SHIELD",
+			Host:     "youtube.com/tv",
+			Path:     ev.DeviceName,
+			Action:   "modified",
+			Details:  ev.Details,
+			ClientIP: ev.DeviceID,
+		})
+	})
+
 	// Web Dashboard server
 	a.webSrv = web.New(web.Deps{
 		Log:         logger,
@@ -160,6 +175,7 @@ func New(dataDir string, version string, logger *slog.Logger) (*App, error) {
 		CA:          a.caInstance,
 		Cosmetic:    a.cosmetic,
 		Proxy:       a.proxySrv,
+		TVShield:    a.tvShield,
 		Config:      a.GetConfig,
 		ApplyConfig: a.ApplyConfig,
 		DNSBound:    a.dnsSrv.Bound,
@@ -219,6 +235,27 @@ func (a *App) Start() error {
 		}
 	}
 
+	// 6b. Start Smart TV YouTube Lounge & SponsorBlock Shield
+	if a.tvShield != nil {
+		a.tvShield.Start(a.ctx, a.cfg.TVShield)
+	}
+
+	// 6c. One-time seed of Smart TV DNS blocklist for upgraded installations
+	if seeded, _ := a.st.GetSetting("smarttv_list_seeded"); seeded == "" {
+		_ = a.st.SetSetting("smarttv_list_seeded", "1")
+		if bl, err := a.st.AddBlocklist(
+			"Perflyst Smart-TV Blocklist (Samsung Tizen, Google TV, LG)",
+			"https://raw.githubusercontent.com/Perflyst/PiHoleBlocklist/master/SmartTV-AGH.txt",
+			true,
+		); err == nil {
+			go func(id int64) {
+				ctx, cancel := context.WithTimeout(a.ctx, 2*time.Minute)
+				defer cancel()
+				_ = a.lists.UpdateOne(ctx, id)
+			}(bl.ID)
+		}
+	}
+
 	// 7. Start Web Dashboard HTTP server
 	if a.cfg.WebListen != "" {
 		if err := a.webSrv.Start(a.cfg.WebListen); err != nil {
@@ -254,9 +291,12 @@ func (a *App) Stop() {
 		a.dnsSrv.Stop()
 	}
 
-	// 2. Stop HTTPS Proxy
+	// 2. Stop HTTPS Proxy & Smart TV Shield
 	if a.proxySrv != nil {
 		a.proxySrv.Stop()
+	}
+	if a.tvShield != nil {
+		a.tvShield.Stop()
 	}
 
 	// 3. Stop Web server
@@ -326,6 +366,11 @@ func (a *App) ApplyConfig(newCfg config.Config) (restartRequired bool, err error
 			BlockBanners:  newCfg.YouTubeShield.BlockBanners,
 			BlockShorts:   newCfg.YouTubeShield.BlockShorts,
 		})
+	}
+
+	// Hot reload Smart TV Shield parameters & devices
+	if a.tvShield != nil {
+		a.tvShield.Configure(newCfg.TVShield)
 	}
 
 	a.cfg = newCfg

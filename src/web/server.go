@@ -32,6 +32,7 @@ import (
 	"sinkhole/src/server/filter"
 	"sinkhole/src/server/proxy"
 	"sinkhole/src/server/stats"
+	"sinkhole/src/server/tvshield"
 	"sinkhole/src/server/upstream"
 	"sinkhole/src/store"
 	"sinkhole/src/system"
@@ -58,6 +59,7 @@ type Deps struct {
 	CA       *ca.CA
 	Cosmetic *content.CosmeticEngine
 	Proxy    *proxy.Proxy
+	TVShield *tvshield.Manager
 
 	Config      func() config.Config
 	ApplyConfig func(config.Config) (restartRequired bool, err error)
@@ -155,6 +157,13 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /api/youtube/teardown", s.postYoutubeTeardown)
 	mux.HandleFunc("GET /api/cosmetic/rules", s.getCosmeticRules)
 	mux.HandleFunc("POST /api/cosmetic/rules", s.addCosmeticRule)
+
+	mux.HandleFunc("GET /api/tv/status", s.getTVStatus)
+	mux.HandleFunc("PUT /api/tv/config", s.putTVConfig)
+	mux.HandleFunc("POST /api/tv/discover", s.postTVDiscover)
+	mux.HandleFunc("POST /api/tv/pair", s.postTVPair)
+	mux.HandleFunc("PATCH /api/tv/devices/{id}", s.patchTVDevice)
+	mux.HandleFunc("DELETE /api/tv/devices/{id}", s.deleteTVDevice)
 
 	return s.middleware(mux)
 }
@@ -1033,6 +1042,216 @@ func (s *Server) addCosmeticRule(w http.ResponseWriter, r *http.Request) {
 	}
 	if ok := s.d.Cosmetic.AddRule(in.Rule); !ok {
 		writeErr(w, http.StatusBadRequest, errors.New("invalid cosmetic rule syntax (expected e.g. domain##.selector)"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// ---------------------------------------------------------------- Smart TV Shield
+
+func (s *Server) getTVStatus(w http.ResponseWriter, r *http.Request) {
+	cfg := s.d.Config()
+	if s.d.TVShield == nil {
+		writeJSON(w, http.StatusOK, tvshield.StatusSnapshot{
+			Enabled:      cfg.TVShield.Enabled,
+			SkipAds:      cfg.TVShield.SkipAds,
+			MuteAds:      cfg.TVShield.MuteAds,
+			SponsorBlock: cfg.TVShield.SponsorBlock,
+			Categories:   cfg.TVShield.Categories,
+			Devices:      []tvshield.DeviceRuntimeStatus{},
+			RecentEvents: []tvshield.TVEvent{},
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, s.d.TVShield.Status(cfg.TVShield))
+}
+
+func (s *Server) putTVConfig(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Enabled      *bool    `json:"enabled"`
+		SkipAds      *bool    `json:"skip_ads"`
+		MuteAds      *bool    `json:"mute_ads"`
+		SponsorBlock *bool    `json:"sponsor_block"`
+		Categories   []string `json:"categories"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	cfg := s.d.Config()
+	if in.Enabled != nil {
+		cfg.TVShield.Enabled = *in.Enabled
+	}
+	if in.SkipAds != nil {
+		cfg.TVShield.SkipAds = *in.SkipAds
+	}
+	if in.MuteAds != nil {
+		cfg.TVShield.MuteAds = *in.MuteAds
+	}
+	if in.SponsorBlock != nil {
+		cfg.TVShield.SponsorBlock = *in.SponsorBlock
+	}
+	if in.Categories != nil {
+		cfg.TVShield.Categories = in.Categories
+	}
+	if _, err := s.d.ApplyConfig(cfg); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	s.getTVStatus(w, r)
+}
+
+func (s *Server) postTVDiscover(w http.ResponseWriter, r *http.Request) {
+	if s.d.TVShield == nil {
+		writeErr(w, http.StatusServiceUnavailable, errors.New("TV Shield manager not initialized"))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
+	defer cancel()
+
+	found, err := s.d.TVShield.Discover(ctx, s.d.Config().TVShield.Devices)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	if found == nil {
+		found = []tvshield.DiscoveredTV{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"devices": found})
+}
+
+func (s *Server) postTVPair(w http.ResponseWriter, r *http.Request) {
+	if s.d.TVShield == nil {
+		writeErr(w, http.StatusServiceUnavailable, errors.New("TV Shield manager not initialized"))
+		return
+	}
+	var in struct {
+		PairingCode string `json:"pairing_code"`
+		DialAppURL  string `json:"dial_app_url"`
+		ScreenID    string `json:"screen_id"`
+		Name        string `json:"name"`
+		Platform    string `json:"platform"`
+		IP          string `json:"ip"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 22*time.Second)
+	defer cancel()
+
+	var (
+		dev config.TVDeviceConfig
+		err error
+	)
+	if strings.TrimSpace(in.PairingCode) != "" {
+		dev, err = s.d.TVShield.PairByCode(ctx, in.PairingCode, in.Name, in.Platform)
+	} else {
+		dev, err = s.d.TVShield.PairByDIAL(ctx, in.DialAppURL, in.ScreenID, in.Name, in.Platform, in.IP)
+	}
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+
+	cfg := s.d.Config()
+	cfg.TVShield.Enabled = true
+	replaced := false
+	for i := range cfg.TVShield.Devices {
+		if cfg.TVShield.Devices[i].ScreenID == dev.ScreenID || cfg.TVShield.Devices[i].ID == dev.ID {
+			if in.Name == "" && cfg.TVShield.Devices[i].Name != "" {
+				dev.Name = cfg.TVShield.Devices[i].Name
+			}
+			cfg.TVShield.Devices[i] = dev
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		cfg.TVShield.Devices = append(cfg.TVShield.Devices, dev)
+	}
+
+	if _, err := s.d.ApplyConfig(cfg); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"ok":     true,
+		"device": dev,
+		"status": s.d.TVShield.Status(s.d.Config().TVShield),
+	})
+}
+
+func (s *Server) patchTVDevice(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeErr(w, http.StatusBadRequest, errors.New("missing device id"))
+		return
+	}
+	var in struct {
+		Name     *string `json:"name"`
+		Platform *string `json:"platform"`
+		Enabled  *bool   `json:"enabled"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+
+	cfg := s.d.Config()
+	found := false
+	for i := range cfg.TVShield.Devices {
+		d := &cfg.TVShield.Devices[i]
+		if d.ID == id || d.ScreenID == id {
+			if in.Name != nil && strings.TrimSpace(*in.Name) != "" {
+				d.Name = strings.TrimSpace(*in.Name)
+			}
+			if in.Platform != nil && strings.TrimSpace(*in.Platform) != "" {
+				d.Platform = strings.TrimSpace(*in.Platform)
+			}
+			if in.Enabled != nil {
+				d.Enabled = *in.Enabled
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		writeErr(w, http.StatusNotFound, errors.New("TV device not found"))
+		return
+	}
+	if _, err := s.d.ApplyConfig(cfg); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	s.getTVStatus(w, r)
+}
+
+func (s *Server) deleteTVDevice(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeErr(w, http.StatusBadRequest, errors.New("missing device id"))
+		return
+	}
+	cfg := s.d.Config()
+	out := make([]config.TVDeviceConfig, 0, len(cfg.TVShield.Devices))
+	removed := false
+	for _, d := range cfg.TVShield.Devices {
+		if d.ID == id || d.ScreenID == id {
+			removed = true
+			continue
+		}
+		out = append(out, d)
+	}
+	if !removed {
+		writeErr(w, http.StatusNotFound, errors.New("TV device not found"))
+		return
+	}
+	cfg.TVShield.Devices = out
+	if _, err := s.d.ApplyConfig(cfg); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})

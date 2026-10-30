@@ -102,7 +102,27 @@ New-NetFirewallRule -DisplayName $ruleWebIn `
     -Profile Any `
     -Description "Allows incoming HTTP connections to Sinkhole Web Dashboard." | Out-Null
 
-Write-Host "✓ Firewall rules applied: Outbound QUIC blocked, Inbound Proxy (8080) and Dashboard (3002) open" -ForegroundColor Green
+$ruleDnsUdpIn = "Sinkhole LAN DNS (UDP Inbound 53)"
+Remove-NetFirewallRule -DisplayName $ruleDnsUdpIn -ErrorAction SilentlyContinue
+New-NetFirewallRule -DisplayName $ruleDnsUdpIn `
+    -Direction Inbound `
+    -Protocol UDP `
+    -LocalPort 53 `
+    -Action Allow `
+    -Profile Any `
+    -Description "Allows Smart TVs, phones, and router on LAN to query Sinkhole DNS over UDP 53." | Out-Null
+
+$ruleDnsTcpIn = "Sinkhole LAN DNS (TCP Inbound 53)"
+Remove-NetFirewallRule -DisplayName $ruleDnsTcpIn -ErrorAction SilentlyContinue
+New-NetFirewallRule -DisplayName $ruleDnsTcpIn `
+    -Direction Inbound `
+    -Protocol TCP `
+    -LocalPort 53 `
+    -Action Allow `
+    -Profile Any `
+    -Description "Allows Smart TVs, phones, and router on LAN to query Sinkhole DNS over TCP 53." | Out-Null
+
+Write-Host "✓ Firewall rules applied: Outbound QUIC blocked, Inbound DNS (53), Proxy (8080), and Dashboard (3002) open" -ForegroundColor Green
 
 # Clear Windows DNS Cache
 Clear-DnsClientCache -ErrorAction SilentlyContinue
