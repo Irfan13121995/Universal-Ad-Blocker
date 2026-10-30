@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Sinkhole YouTube Ad-Blocker Companion",
+  "version": "1.0.0",
+  "description": "Zero-latency YouTube video ad defuser, sponsor card stripper, and anti-adblock bypass for Sinkhole.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Sinkhole YouTube Shield"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://youtube.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "adblock.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

@@ -252,6 +252,17 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	s.rec.Record(entry)
 }
 
+func isQUICSuppressed(name string, qtype uint16) bool {
+	if qtype != dns.TypeHTTPS && qtype != dns.TypeSVCB {
+		return false
+	}
+	n := strings.ToLower(name)
+	return n == "youtube.com" || strings.HasSuffix(n, ".youtube.com") ||
+		n == "googlevideo.com" || strings.HasSuffix(n, ".googlevideo.com") ||
+		n == "youtu.be" || strings.HasSuffix(n, ".youtu.be") ||
+		n == "ytimg.com" || strings.HasSuffix(n, ".ytimg.com")
+}
+
 func (s *Server) resolve(ctx context.Context, r *dns.Msg, q dns.Question, name string, opts *Options, e *store.QueryEntry) *dns.Msg {
 	if m := s.localAnswer(r, q, name, opts); m != nil {
 		e.Status, e.Reason, e.Answer = "allowed", "local", summarize(m)
@@ -259,6 +270,16 @@ func (s *Server) resolve(ctx context.Context, r *dns.Msg, q dns.Question, name s
 	}
 
 	if opts.Protection {
+		if isQUICSuppressed(name, q.Qtype) {
+			e.Status, e.Reason = "blocked", "suppressed QUIC/HTTPS record for YouTube"
+			m := new(dns.Msg)
+			m.SetReply(r)
+			m.Rcode = dns.RcodeSuccess
+			m.Ns = []dns.RR{fakeSOA(q.Name, 60)}
+			e.Answer = "NODATA (forced TCP fallback)"
+			return m
+		}
+
 		if res := s.engine.Match(name); res.Blocked {
 			e.Status, e.Reason = "blocked", describe(res)
 			m := s.blockedResponse(r, q, opts)

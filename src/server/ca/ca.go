@@ -5,6 +5,7 @@
 package ca
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -274,32 +275,38 @@ func (c *CA) InstallWindowsRoot() error {
 		return err
 	}
 
-	// 1. Install to CurrentUser root store (does not require admin prompt)
-	cmdUser := exec.Command("certutil.exe", "-addstore", "-user", "-f", "Root", certPath)
-	cmdUser.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	_ = cmdUser.Run()
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
 
-	// 2. Also attempt LocalMachine root store (for system services & all users)
-	cmdMachine := exec.Command("certutil.exe", "-addstore", "-f", "Root", certPath)
+	// 1. Install to LocalMachine root store (for system services & all users)
+	cmdMachine := exec.CommandContext(ctx, "certutil.exe", "-addstore", "-f", "Root", certPath)
 	cmdMachine.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	_ = cmdMachine.Run()
+
+	// 2. Also try user store
+	cmdUser := exec.CommandContext(ctx, "certutil.exe", "-addstore", "-user", "-f", "Root", certPath)
+	cmdUser.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	_ = cmdUser.Run()
 
 	// 3. Configure Firefox to trust Windows Enterprise Roots
 	_ = EnableFirefoxEnterpriseRoots()
 
 	if !c.IsTrusted() {
-		return errors.New("certutil execution failed to establish certificate trust")
+		return errors.New("administrator elevation required: run .\\scripts\\Enable-YouTubeShield.ps1 as Administrator")
 	}
 	return nil
 }
 
 // UninstallWindowsRoot removes the Root CA from the Windows certificate stores.
 func (c *CA) UninstallWindowsRoot() error {
-	cmdUser := exec.Command("certutil.exe", "-delstore", "-user", "Root", CAName)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+
+	cmdUser := exec.CommandContext(ctx, "certutil.exe", "-delstore", "-user", "Root", CAName)
 	cmdUser.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	_ = cmdUser.Run()
 
-	cmdMachine := exec.Command("certutil.exe", "-delstore", "Root", CAName)
+	cmdMachine := exec.CommandContext(ctx, "certutil.exe", "-delstore", "Root", CAName)
 	cmdMachine.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	_ = cmdMachine.Run()
 
@@ -308,19 +315,23 @@ func (c *CA) UninstallWindowsRoot() error {
 
 // IsTrusted checks whether the CA is installed and trusted in the Windows store.
 func (c *CA) IsTrusted() bool {
-	// Check user store first
-	cmd := exec.Command("certutil.exe", "-verifystore", "-user", "Root", CAName)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Check local machine store first
+	cmdM := exec.CommandContext(ctx, "certutil.exe", "-verifystore", "Root", CAName)
+	cmdM.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	if out, err := cmdM.CombinedOutput(); err == nil && strings.Contains(string(out), CAName) {
+		return true
+	}
+
+	// Check user store
+	cmd := exec.CommandContext(ctx, "certutil.exe", "-verifystore", "-user", "Root", CAName)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	if out, err := cmd.CombinedOutput(); err == nil && strings.Contains(string(out), CAName) {
 		return true
 	}
 
-	// Check local machine store
-	cmdM := exec.Command("certutil.exe", "-verifystore", "Root", CAName)
-	cmdM.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	if out, err := cmdM.CombinedOutput(); err == nil && strings.Contains(string(out), CAName) {
-		return true
-	}
 	return false
 }
 

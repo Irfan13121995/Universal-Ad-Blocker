@@ -17,6 +17,11 @@ func TestSanitizePlayerJSON(t *testing.T) {
 		"adSlots": [
 			{"adSlotRenderer": {"slotType": "SLOT_TYPE_PLAYER_BYTE"}}
 		],
+		"adBreakHeartbeatParams": "encoded_heartbeat_data",
+		"interstitial": {"type": "preroll"},
+		"playerConfig": {
+			"adConfig": {"clientPings": true}
+		},
 		"playbackTracking": {
 			"videostatsPlaybackUrl": "https://s.youtube.com/api/stats/playback",
 			"qoeUrl": "https://s.youtube.com/api/stats/qoe"
@@ -44,6 +49,15 @@ func TestSanitizePlayerJSON(t *testing.T) {
 	}
 	if strings.Contains(sanitizedStr, "videostatsPlaybackUrl") {
 		t.Error("videostatsPlaybackUrl was not stripped")
+	}
+	if strings.Contains(sanitizedStr, "adBreakHeartbeatParams") {
+		t.Error("adBreakHeartbeatParams was not stripped")
+	}
+	if strings.Contains(sanitizedStr, "interstitial") {
+		t.Error("interstitial was not stripped")
+	}
+	if strings.Contains(sanitizedStr, "adConfig") {
+		t.Error("adConfig was not stripped")
 	}
 	if !strings.Contains(sanitizedStr, "dQw4w9WgXcQ") {
 		t.Error("videoDetails were corrupted")

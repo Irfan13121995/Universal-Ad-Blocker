@@ -299,6 +299,12 @@ func (p *Proxy) serveMitMConnection(clientConn net.Conn, upstreamConn net.Conn, 
 			continue
 		}
 
+		isYT := strings.Contains(host, "youtube.com") || strings.Contains(host, "youtu.be")
+		if isYT {
+			// Normalize Accept-Encoding to gzip, deflate so upstream sends formats we can inspect
+			req.Header.Set("Accept-Encoding", "gzip, deflate")
+		}
+
 		// Forward to upstream
 		if err := req.Write(upstreamConn); err != nil {
 			return
@@ -319,12 +325,24 @@ func (p *Proxy) serveMitMConnection(clientConn net.Conn, upstreamConn net.Conn, 
 func (p *Proxy) inspectAndWriteResponse(clientConn net.Conn, resp *http.Response, req *http.Request, host, clientIP string) {
 	defer resp.Body.Close()
 
-	isYT := strings.Contains(host, "youtube.com")
+	isYT := strings.Contains(host, "youtube.com") || strings.Contains(host, "youtu.be")
 
 	// 1. YouTube Player API Ad Stripping
 	if isYT && content.IsYouTubePlayerAPI(req.URL.Path) {
-		body, err := io.ReadAll(resp.Body)
-		if err == nil {
+		encoding := strings.ToLower(resp.Header.Get("Content-Encoding"))
+		var reader io.Reader = resp.Body
+		var gzReader *gzip.Reader
+		if strings.Contains(encoding, "gzip") {
+			var err error
+			gzReader, err = gzip.NewReader(resp.Body)
+			if err == nil {
+				defer gzReader.Close()
+				reader = gzReader
+			}
+		}
+
+		body, err := io.ReadAll(reader)
+		if err == nil && len(body) > 0 {
 			sanitized, stripped := content.SanitizePlayerJSON(body)
 			if stripped {
 				p.record(InspectorEvent{
@@ -332,6 +350,7 @@ func (p *Proxy) inspectAndWriteResponse(clientConn net.Conn, resp *http.Response
 					Details: "YouTube video ads sanitized from player payload", ClientIP: clientIP,
 				})
 			}
+			resp.Header.Del("Content-Encoding")
 			resp.Body = io.NopCloser(bytes.NewReader(sanitized))
 			resp.ContentLength = int64(len(sanitized))
 			resp.Header.Set("Content-Length", strconv.Itoa(len(sanitized)))
@@ -344,8 +363,8 @@ func (p *Proxy) inspectAndWriteResponse(clientConn net.Conn, resp *http.Response
 	contentType := resp.Header.Get("Content-Type")
 	if strings.Contains(contentType, "text/html") && resp.StatusCode == http.StatusOK {
 		var reader io.Reader = resp.Body
-		isGzip := strings.EqualFold(resp.Header.Get("Content-Encoding"), "gzip")
-		if isGzip {
+		encoding := strings.ToLower(resp.Header.Get("Content-Encoding"))
+		if strings.Contains(encoding, "gzip") {
 			gz, err := gzip.NewReader(resp.Body)
 			if err == nil {
 				defer gz.Close()

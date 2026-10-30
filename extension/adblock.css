@@ -1,0 +1,32 @@
+/* Sinkhole YouTube Comprehensive Cosmetic Ad Removal */
+#masthead-ad,
+ytd-banner-promo-renderer,
+ytd-ad-slot-renderer,
+ytd-in-feed-ad-layout-renderer,
+.ytd-companion-slot-renderer,
+#player-ads,
+.ytp-ad-module,
+.ytp-ad-overlay-container,
+.ytp-ad-message-container,
+ytd-promoted-sparkles-web-renderer,
+ytd-promoted-sparkles-text-search-renderer,
+ytd-display-ad-renderer,
+ytd-statement-banner-renderer,
+.ytp-ad-preview-container,
+.ytp-ad-skip-button-container,
+.ytp-ad-skip-button-modern,
+.ytp-ad-survey,
+.ytp-ad-image-overlay,
+#rendering-content > ytd-ad-slot-renderer,
+ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
+ytd-rich-section-renderer:has(ytd-statement-banner-renderer),
+ytd-ad-break-service-renderer,
+tp-yt-paper-dialog:has(ytd-enforcement-message-view-model),
+ytd-enforcement-message-view-model {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  width: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

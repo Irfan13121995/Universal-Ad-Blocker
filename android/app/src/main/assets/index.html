@@ -1352,6 +1352,62 @@
         </div>
       </div>
 
+      <!-- YouTube Protection & Video Ad Defusal Health Card -->
+      <div class="panel" id="overviewYtHealthCard" style="margin-top:1.25rem; border-color: rgba(255, 159, 10, 0.4); background: linear-gradient(180deg, rgba(255, 159, 10, 0.05) 0%, rgba(18, 18, 22, 0.7) 100%);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+          <div>
+            <div class="panel-title" style="display:flex; align-items:center; gap:0.5rem;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>YouTube Video Ad Shield Health</span>
+            </div>
+            <div class="panel-sub" style="margin-top:0.25rem;">
+              Eliminates in-stream prerolls, midrolls, and sponsor cards across Chrome, Edge, and Firefox.
+            </div>
+          </div>
+          <button class="btn btn-primary" id="yt1ClickSetupBtn" onclick="setupYouTubeShield()">
+            ⚡ 1-Click Activate Full YouTube Shield
+          </button>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:0.75rem; margin-top:1rem;">
+          <div style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:0.75rem 1rem; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">Windows Root CA</div>
+              <div style="font-weight:600; font-size:0.85rem;">SSL Certificate</div>
+            </div>
+            <span class="badge error yt-health-badge" id="ytHealthCaBadge"><span class="badge-dot"></span> Checking...</span>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:0.75rem 1rem; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">System Proxy</div>
+              <div style="font-weight:600; font-size:0.85rem;">127.0.0.1:8080</div>
+            </div>
+            <span class="badge error yt-health-badge" id="ytHealthProxyBadge"><span class="badge-dot"></span> Checking...</span>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:0.75rem 1rem; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">QUIC Protocol</div>
+              <div style="font-weight:600; font-size:0.85rem;">UDP Port 443</div>
+            </div>
+            <span class="badge error yt-health-badge" id="ytHealthQuicBadge"><span class="badge-dot"></span> Checking...</span>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:0.75rem 1rem; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">Player Defuser</div>
+              <div style="font-weight:600; font-size:0.85rem;">Scriptlet & CSS</div>
+            </div>
+            <span class="badge allowed yt-health-badge" id="ytHealthEngineBadge"><span class="badge-dot"></span> Active</span>
+          </div>
+        </div>
+
+        <div style="margin-top:0.75rem; font-size:0.75rem; color:var(--text-secondary); line-height:1.5;">
+          💡 <strong>Why this matters:</strong> YouTube serves ads and videos from the same domain (<code>*.googlevideo.com</code>). DNS alone cannot block video ads without breaking video playback. The YouTube Shield uses local SSL inspection and early scriptlet hooks to strip video ads while preserving full 4K streaming speed.
+        </div>
+      </div>
+
       <!-- Interactive 24-Hour Timeline -->
       <div class="chart-card">
         <div class="chart-header">
@@ -1748,13 +1804,17 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">How YouTube Ad Defusal Works</div>
+        <div class="panel-title">How YouTube Ad Defusal Works (Desktop vs Mobile)</div>
         <div style="font-size:0.85rem; color:var(--text-secondary); line-height:1.6; margin-top:0.5rem;">
           <p style="margin-bottom:0.6rem;">
-            1. <strong>Zero Playback Buffering:</strong> Video streams pass through a direct, zero-copy TCP tunnel. The proxy never re-encodes media chunks, preserving full 4K 60fps throughput.
+            1. <strong>Windows 11 Browsers (Chrome, Edge, Firefox, Brave):</strong> When the 1-Click Shield is active, Windows routes browser web traffic through the local proxy (<code>127.0.0.1:8080</code>) using your trusted local CA. Outbound QUIC (UDP 443) is blocked so browsers cannot bypass the proxy. Player API payloads are sanitized and the early scriptlet auto-skips any server-stitched ad breaks.
           </p>
           <p style="margin-bottom:0.6rem;">
-            2. <strong>Player API Sanitization:</strong> Intercepts <code class="code-box">POST /youtubei/v1/player</code>, strips ad cues, and starts the video with 0 ads scheduled.
+            2. <strong>Zero Playback Buffering:</strong> Video streams (<code>*.googlevideo.com/videoplayback</code>) pass through a direct, zero-copy TCP tunnel. The proxy never re-encodes media chunks, preserving full 4K/60fps and 8K HDR throughput.
+          </p>
+          <p style="margin-bottom:0.6rem;">
+            3. <strong>Android Mobile Protection:</strong> Private DNS (DoT) blocks all tracker and banner domains. For video ads on Android:
+            the native YouTube app hardcodes SSL pinning (rejecting custom CAs); to enjoy 100% ad-free YouTube videos on Android, watch via mobile browsers (Chrome/Brave/Firefox) connected to Sinkhole or use the companion web shell.
           </p>
         </div>
       </div>
@@ -2187,11 +2247,11 @@
 
     function refreshCurrentView() {
       fetchStatus();
-      if (currentView === 'overview') fetchStats();
+      if (currentView === 'overview') { fetchStats(); fetchYouTubeHealth(); }
       if (currentView === 'querylog') fetchQueryLog();
       if (currentView === 'blocklists') fetchBlocklists();
       if (currentView === 'rules') fetchRules();
-      if (currentView === 'youtube') fetchYouTubeConfig();
+      if (currentView === 'youtube') { fetchYouTubeConfig(); fetchYouTubeHealth(); }
       if (currentView === 'https') { fetchCAStatus(); fetchProxyStatus(); }
       if (currentView === 'inspector') fetchCosmeticRules();
       if (currentView === 'settings') fetchSettings();
@@ -2777,6 +2837,96 @@
       try {
         await api('/api/youtube', { method: 'PUT', body: JSON.stringify(payload) });
         showToast('YouTube Shield configuration saved');
+        fetchYouTubeHealth();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function fetchYouTubeHealth() {
+      try {
+        const h = await api('/api/youtube/health');
+        renderYouTubeHealthWidgets(h);
+      } catch (e) {
+        console.warn('Failed to load YouTube health', e);
+      }
+    }
+
+    function renderYouTubeHealthWidgets(h) {
+      const allHealthy = h.all_healthy;
+
+      const caBadge = document.getElementById('ytHealthCaBadge');
+      if (caBadge) {
+        caBadge.className = `badge ${h.ca_trusted ? 'allowed' : 'error'}`;
+        caBadge.innerHTML = `<span class="badge-dot"></span> ${h.ca_trusted ? 'Trusted' : 'Not Trusted'}`;
+      }
+
+      const proxyBadge = document.getElementById('ytHealthProxyBadge');
+      if (proxyBadge) {
+        proxyBadge.className = `badge ${h.proxy_enabled ? 'allowed' : 'error'}`;
+        proxyBadge.innerHTML = `<span class="badge-dot"></span> ${h.proxy_enabled ? 'Active (8080)' : 'Disabled'}`;
+      }
+
+      const quicBadge = document.getElementById('ytHealthQuicBadge');
+      if (quicBadge) {
+        quicBadge.className = `badge ${h.quic_blocked ? 'allowed' : 'error'}`;
+        quicBadge.innerHTML = `<span class="badge-dot"></span> ${h.quic_blocked ? 'QUIC Blocked' : 'QUIC Allowed'}`;
+      }
+
+      const engineBadge = document.getElementById('ytHealthEngineBadge');
+      if (engineBadge) {
+        engineBadge.className = `badge ${h.shield_enabled ? 'allowed' : 'error'}`;
+        engineBadge.innerHTML = `<span class="badge-dot"></span> ${h.shield_enabled ? 'Defuser Active' : 'Disabled'}`;
+      }
+
+      const mainBtn = document.getElementById('yt1ClickSetupBtn');
+      if (mainBtn) {
+        if (allHealthy) {
+          mainBtn.className = 'btn btn-secondary btn-sm';
+          mainBtn.innerHTML = '✓ YouTube Shield Active (Revert)';
+          mainBtn.onclick = teardownYouTubeShield;
+        } else {
+          mainBtn.className = 'btn btn-primary';
+          mainBtn.innerHTML = '⚡ 1-Click Activate Full YouTube Shield';
+          mainBtn.onclick = setupYouTubeShield;
+        }
+      }
+
+      const overviewCard = document.getElementById('overviewYtHealthCard');
+      if (overviewCard) {
+        if (allHealthy) {
+          overviewCard.style.borderColor = 'rgba(52, 199, 89, 0.4)';
+          overviewCard.style.background = 'linear-gradient(180deg, rgba(52, 199, 89, 0.06) 0%, rgba(18, 18, 22, 0.7) 100%)';
+        } else {
+          overviewCard.style.borderColor = 'rgba(255, 159, 10, 0.4)';
+          overviewCard.style.background = 'linear-gradient(180deg, rgba(255, 159, 10, 0.05) 0%, rgba(18, 18, 22, 0.7) 100%)';
+        }
+      }
+    }
+
+    async function setupYouTubeShield() {
+      triggerHaptic('heavy');
+      showToast('Activating Root CA, System Proxy, and QUIC Firewall...');
+      try {
+        const h = await api('/api/youtube/setup', { method: 'POST' });
+        renderYouTubeHealthWidgets(h);
+        fetchCAStatus();
+        fetchProxyStatus();
+        showToast('✓ YouTube Shield fully activated across all desktop browsers!');
+      } catch (err) {
+        showToast('Setup error: ' + err.message, true);
+      }
+    }
+
+    async function teardownYouTubeShield() {
+      triggerHaptic('click');
+      if (!confirm('Disable YouTube system proxy and restore standard network settings?')) return;
+      try {
+        const h = await api('/api/youtube/teardown', { method: 'POST' });
+        renderYouTubeHealthWidgets(h);
+        fetchCAStatus();
+        fetchProxyStatus();
+        showToast('YouTube Shield and System Proxy deactivated.');
       } catch (err) {
         showToast(err.message, true);
       }
@@ -2992,6 +3142,7 @@
       } else {
         fetchStatus();
         fetchStats();
+        fetchYouTubeHealth();
         setupSSE();
       }
     });

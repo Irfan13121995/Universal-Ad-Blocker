@@ -3,6 +3,8 @@
 package system
 
 import (
+	"os/exec"
+	"strings"
 	"syscall"
 
 	"golang.org/x/sys/windows/registry"
@@ -81,6 +83,8 @@ func EnableSystemProxy(proxyServer, pacURL string) error {
 
 	if pacURL != "" {
 		_ = k.SetStringValue("AutoConfigURL", pacURL)
+	} else {
+		_ = k.DeleteValue("AutoConfigURL")
 	}
 
 	refreshInternetSettings()
@@ -102,6 +106,31 @@ func DisableSystemProxy() error {
 	_ = k.DeleteValue("AutoConfigURL")
 
 	refreshInternetSettings()
+	return nil
+}
+
+// IsQUICBlocked checks if the outbound QUIC firewall block rule is present.
+func IsQUICBlocked() bool {
+	cmd := exec.Command("netsh", "advfirewall", "firewall", "show", "rule", "name=Sinkhole Block QUIC (UDP 443 Outbound)")
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.CombinedOutput()
+	return err == nil && strings.Contains(string(out), "Sinkhole Block QUIC")
+}
+
+// SetQUICBlocked toggles the outbound QUIC firewall block rule.
+func SetQUICBlocked(block bool) error {
+	ruleName := "Sinkhole Block QUIC (UDP 443 Outbound)"
+	// Remove existing rule first to prevent duplicates
+	delCmd := exec.Command("netsh", "advfirewall", "firewall", "delete", "rule", "name="+ruleName)
+	delCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	_ = delCmd.Run()
+
+	if block {
+		addCmd := exec.Command("netsh", "advfirewall", "firewall", "add", "rule",
+			"name="+ruleName, "dir=out", "action=block", "protocol=UDP", "remoteport=443")
+		addCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		return addCmd.Run()
+	}
 	return nil
 }
 

@@ -148,6 +148,9 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /api/proxy/disable", s.proxyDisable)
 	mux.HandleFunc("GET /api/youtube", s.getYoutube)
 	mux.HandleFunc("PUT /api/youtube", s.putYoutube)
+	mux.HandleFunc("GET /api/youtube/health", s.getYoutubeHealth)
+	mux.HandleFunc("POST /api/youtube/setup", s.postYoutubeSetup)
+	mux.HandleFunc("POST /api/youtube/teardown", s.postYoutubeTeardown)
 	mux.HandleFunc("GET /api/cosmetic/rules", s.getCosmeticRules)
 	mux.HandleFunc("POST /api/cosmetic/rules", s.addCosmeticRule)
 
@@ -858,6 +861,57 @@ func (s *Server) proxyDisable(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getYoutube(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.d.Config().YouTubeShield)
+}
+
+func (s *Server) getYoutubeHealth(w http.ResponseWriter, r *http.Request) {
+	caTrusted := s.d.CA != nil && s.d.CA.IsTrusted()
+	proxyStatus, _ := system.GetProxyStatus()
+	quicBlocked := system.IsQUICBlocked()
+	cfg := s.d.Config()
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ca_trusted":      caTrusted,
+		"proxy_enabled":   proxyStatus.Enabled,
+		"proxy_server":    proxyStatus.Server,
+		"proxy_listening": s.d.Proxy != nil,
+		"quic_blocked":    quicBlocked,
+		"shield_enabled":  cfg.YouTubeShield.Enabled,
+		"all_healthy":     caTrusted && proxyStatus.Enabled && quicBlocked && cfg.YouTubeShield.Enabled,
+	})
+}
+
+func (s *Server) postYoutubeSetup(w http.ResponseWriter, r *http.Request) {
+	// 1. Install & trust CA if not already trusted
+	if s.d.CA != nil && !s.d.CA.IsTrusted() {
+		if err := s.d.CA.InstallWindowsRoot(); err != nil {
+			s.d.Log.Warn("auto-install Root CA error", "err", err)
+		}
+	}
+
+	// 2. Enable Windows proxy
+	cfg := s.d.Config()
+	host, port, _ := net.SplitHostPort(cfg.ProxyListen)
+	if host == "" || host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	proxyAddr := net.JoinHostPort(host, port)
+	if err := system.EnableSystemProxy(proxyAddr, ""); err != nil {
+		s.d.Log.Warn("enable system proxy error", "err", err)
+	}
+
+	// 3. Block QUIC (UDP 443) outbound
+	if err := system.SetQUICBlocked(true); err != nil {
+		s.d.Log.Warn("block QUIC firewall error", "err", err)
+	}
+
+	// 4. Return new health status
+	s.getYoutubeHealth(w, r)
+}
+
+func (s *Server) postYoutubeTeardown(w http.ResponseWriter, r *http.Request) {
+	_ = system.DisableSystemProxy()
+	_ = system.SetQUICBlocked(false)
+	s.getYoutubeHealth(w, r)
 }
 
 func (s *Server) putYoutube(w http.ResponseWriter, r *http.Request) {
