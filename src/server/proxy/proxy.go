@@ -351,6 +351,8 @@ func (p *Proxy) inspectAndWriteResponse(clientConn net.Conn, resp *http.Response
 				})
 			}
 			resp.Header.Del("Content-Encoding")
+			resp.Header.Del("Transfer-Encoding")
+			resp.TransferEncoding = nil
 			resp.Body = io.NopCloser(bytes.NewReader(sanitized))
 			resp.ContentLength = int64(len(sanitized))
 			resp.Header.Set("Content-Length", strconv.Itoa(len(sanitized)))
@@ -393,6 +395,8 @@ func (p *Proxy) inspectAndWriteResponse(clientConn net.Conn, resp *http.Response
 			}
 
 			resp.Header.Del("Content-Encoding")
+			resp.Header.Del("Transfer-Encoding")
+			resp.TransferEncoding = nil
 			resp.Body = io.NopCloser(bytes.NewReader(modified))
 			resp.ContentLength = int64(len(modified))
 			resp.Header.Set("Content-Length", strconv.Itoa(len(modified)))

@@ -537,6 +537,15 @@ func (s *Server) addRule(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, errors.New(`action must be "block" or "allow"`))
 		return
 	}
+	if in.Action == "block" {
+		low := strings.ToLower(d)
+		if low == "youtube.com" || low == "www.youtube.com" || low == "googlevideo.com" || low == "google.com" {
+			if !strings.Contains(strings.ToLower(in.Comment), "force") {
+				writeErr(w, http.StatusBadRequest, fmt.Errorf("safety check: blocking %s takes the platform offline; use YouTube Shield instead", d))
+				return
+			}
+		}
+	}
 	rule, err := s.d.Store.AddRule(filter.CustomRule{
 		Domain: d, Action: in.Action, Subdomains: in.Subdomains || sub, Comment: strings.TrimSpace(in.Comment),
 	})

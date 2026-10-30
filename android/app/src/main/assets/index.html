@@ -2512,6 +2512,10 @@
 
     async function quickRule(domain, action) {
       triggerHaptic('click');
+      if (action === 'block' && (domain.includes('youtube.com') || domain.includes('googlevideo.com'))) {
+        showToast('Cannot block core YouTube domain. YouTube Shield handles ad elimination automatically.', true);
+        return;
+      }
       try {
         await api('/api/rules', {
           method: 'POST',
