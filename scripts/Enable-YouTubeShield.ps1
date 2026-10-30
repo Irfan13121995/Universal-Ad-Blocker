@@ -38,10 +38,9 @@ if (-not (Test-Path $CertPath)) {
 }
 
 if (Test-Path $CertPath) {
-    Write-Host "[1/4] Installing Sinkhole Root CA into Windows Certificate Store..." -ForegroundColor Yellow
-    certutil.exe -addstore -user -f "Root" $CertPath | Out-Null
-    certutil.exe -addstore -f "Root" $CertPath | Out-Null
-    Write-Host "✓ Root CA installed into CurrentUser & LocalMachine Root store" -ForegroundColor Green
+    Write-Host "[1/4] Installing Sinkhole Root CA into Windows Certificate Store (LocalMachine Root)..." -ForegroundColor Yellow
+    certutil.exe -addstore -f "Root" $CertPath
+    Write-Host "✓ Root CA installed into LocalMachine Root store" -ForegroundColor Green
 } else {
     Write-Warning "Root CA certificate not found at $CertPath. Start sinkhole.exe once to generate it."
 }
