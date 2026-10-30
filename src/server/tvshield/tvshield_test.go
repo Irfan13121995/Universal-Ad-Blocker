@@ -149,6 +149,8 @@ func TestEndToEndLoungeSkipMuteAndSponsorBlock(t *testing.T) {
 					sc = fmt.Sprintf("setVolume:%s:%s", r.Form.Get("req0_volume"), r.Form.Get("req0_muted"))
 				} else if sc == "seekTo" {
 					sc = fmt.Sprintf("seekTo:%s", r.Form.Get("req0_newTime"))
+				} else if sc == "setPlaylist" {
+					sc = fmt.Sprintf("setPlaylist:%s:%s", r.Form.Get("req0_videoId"), r.Form.Get("req0_currentTime"))
 				}
 				mu.Lock()
 				commands = append(commands, sc)
@@ -211,6 +213,9 @@ func TestEndToEndLoungeSkipMuteAndSponsorBlock(t *testing.T) {
 	w.handleEvent(sess, "onAdStateChange", []json.RawMessage{
 		json.RawMessage(`{"adState":"1","currentTime":"5.0","isSkipEnabled":"true"}`),
 	})
+	w.handleEvent(sess, "onAdStateChange", []json.RawMessage{
+		json.RawMessage(`{"adState":"0","currentTime":"5.0","isSkipEnabled":"false"}`),
+	})
 	time.Sleep(80 * time.Millisecond)
 
 	// 3. Simulate content video playing right inside SponsorBlock segment (at 5.2s) -> should seekTo 25.00
@@ -228,6 +233,117 @@ func TestEndToEndLoungeSkipMuteAndSponsorBlock(t *testing.T) {
 	for _, want := range wantSub {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("expected command %q in recorded commands %v", want, gotCmds)
+		}
+	}
+}
+
+func TestSamsungTizenUnskippableAdPodForceBypass(t *testing.T) {
+	var (
+		mu       sync.Mutex
+		commands []string
+	)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/bc/bind" {
+			if r.Method == http.MethodPost && r.URL.Query().Get("SID") == "" {
+				body := `[[0,["c","sid_tizen"]],[1,["S","gsess_tizen"]],[2,["onVolumeChanged",{"volume":"42","muted":"false"}]]]`
+				_, _ = w.Write([]byte(formatBCChunk(body)))
+				return
+			}
+			if r.Method == http.MethodPost {
+				_ = r.ParseForm()
+				sc := r.Form.Get("req0__sc")
+				switch sc {
+				case "setVolume":
+					sc = fmt.Sprintf("setVolume:%s:%s", r.Form.Get("req0_volume"), r.Form.Get("req0_muted"))
+				case "seekTo":
+					sc = fmt.Sprintf("seekTo:%s", r.Form.Get("req0_newTime"))
+				case "setPlaylist":
+					sc = fmt.Sprintf("setPlaylist:%s:%s", r.Form.Get("req0_videoId"), r.Form.Get("req0_currentTime"))
+				}
+				mu.Lock()
+				commands = append(commands, sc)
+				mu.Unlock()
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	mgr := NewManager(nil, nil)
+	mgr.lounge.apiBase = srv.URL
+	mgr.sb.baseURL = srv.URL
+	mgr.cfg = config.TVShieldConfig{
+		Enabled:      true,
+		SkipAds:      true,
+		MuteAds:      true,
+		SponsorBlock: false,
+	}
+
+	ctx := context.Background()
+	dev := config.TVDeviceConfig{
+		ID:          "tizen_1",
+		Name:        "Samsung QN93AA 65 TV",
+		ScreenID:    "tizen_1",
+		LoungeToken: "tok_tizen",
+		Platform:    "Samsung Tizen",
+		Enabled:     true,
+	}
+
+	met := &deviceMetrics{}
+	w := newDeviceWorker(ctx, mgr, dev, met)
+	w.bypassWaitSec = 0.08 // Fast timer for deterministic unit test
+	defer w.cancel()
+
+	sess := mgr.lounge.NewSession(dev.ScreenID, dev.LoungeToken)
+	if err := sess.Connect(ctx, func(evType string, args []json.RawMessage) {
+		w.handleEvent(sess, evType, args)
+	}); err != nil {
+		t.Fatalf("Session.Connect failed: %v", err)
+	}
+
+	// 1. Content video playing at 120s of a 600s video
+	w.handleEvent(sess, "nowPlaying", []json.RawMessage{
+		json.RawMessage(`{"videoId":"vid_mid","state":"1","currentTime":"120.0","duration":"600.0"}`),
+	})
+
+	// 2. Unskippable 30s midroll ad starts on Samsung Tizen
+	w.handleEvent(sess, "adPlaying", []json.RawMessage{
+		json.RawMessage(`{"adTitle":"30s Commercial","contentVideoId":"vid_mid","currentTime":"0","duration":"30.0","isSkippable":"false","isSkipEnabled":"false"}`),
+	})
+
+	// 3. Tizen quirk: emits onStateChange(state="1", duration="30.0") for the playing ad!
+	// Must NOT clear adActive, must NOT unmute, and must NOT cancel the force-bypass timer!
+	w.handleEvent(sess, "onStateChange", []json.RawMessage{
+		json.RawMessage(`{"state":"1","currentTime":"0.3","duration":"30.0"}`),
+	})
+
+	// Wait for fast bypassWaitSec (80ms) + skipAd settle (60ms) + setPlaylist execution
+	time.Sleep(240 * time.Millisecond)
+
+	if gotMuted := met.adsMuted.Load(); gotMuted != 1 {
+		t.Fatalf("expected AdsMuted == 1 (no double-mute), got %d", gotMuted)
+	}
+	if gotSkipped := met.adsSkipped.Load(); gotSkipped != 1 {
+		t.Fatalf("expected AdsSkipped == 1 via setPlaylist force-bypass, got %d", gotSkipped)
+	}
+
+	// 4. Reloaded content video starts playing on TV (initially reporting currentTime 0 before seek)
+	w.handleEvent(sess, "nowPlaying", []json.RawMessage{
+		json.RawMessage(`{"videoId":"vid_mid","state":"1","currentTime":"0.0","duration":"600.0"}`),
+	})
+	time.Sleep(80 * time.Millisecond)
+
+	mu.Lock()
+	gotCmds := append([]string(nil), commands...)
+	mu.Unlock()
+	joined := strings.Join(gotCmds, ",")
+
+	for _, wantPrefix := range []string{"setVolume:42:true", "skipAd", "setPlaylist:vid_mid:120.", "setVolume:42:false", "seekTo:120."} {
+		if !strings.Contains(joined, wantPrefix) {
+			t.Fatalf("expected %q in commands, got %v", wantPrefix, gotCmds)
 		}
 	}
 }

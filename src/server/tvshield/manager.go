@@ -377,28 +377,47 @@ type deviceWorker struct {
 	id       string
 	screenID string
 
-	mu            sync.Mutex
-	name          string
-	platform      string
-	ip            string
-	loungeToken   string
-	state         string
-	screenName    string
-	deviceModel   string
-	currentVideo  string
-	lastSeen      int64
-	lastAction    string
-	savedVolume   int
-	tvMuted       bool
-	mutedByShield bool
-	adActive      bool
-	playbackSpeed float64
-	lastAdSkipAt  time.Time
-	lastSeekKey   string
-	lastSeekAt    time.Time
-	seekTimer     *time.Timer
-	adSkipTimer   *time.Timer
-	activeSess    *Session
+	mu               sync.Mutex
+	name             string
+	platform         string
+	ip               string
+	loungeToken      string
+	state            string
+	screenName       string
+	deviceModel      string
+	currentVideo     string
+	lastVideoID      string
+	lastContentPos   float64
+	lastContentDur   float64
+	lastContentSpeed float64
+	lastPosAt        time.Time
+	hasContentPos    bool
+	contentPlaying   bool
+	lastSeen         int64
+	lastAction       string
+	savedVolume      int
+	tvMuted          bool
+	mutedByShield    bool
+	adActive         bool
+	adTargetVideo    string
+	adResumePos      float64
+	adCurrentTime    float64
+	adDuration       float64
+	adSkippable      bool
+	adTitle          string
+	adBreakStart     time.Time
+	pendingSeekVideo string
+	pendingSeekPos   float64
+	lastBypassVid    string
+	lastBypassAt     time.Time
+	playbackSpeed    float64
+	lastAdSkipAt     time.Time
+	lastSeekKey      string
+	lastSeekAt       time.Time
+	seekTimer        *time.Timer
+	adSkipTimer      *time.Timer
+	bypassWaitSec    float64 // 0 uses default 5.15s; overridable in unit tests
+	activeSess       *Session
 }
 
 func newDeviceWorker(parent context.Context, mgr *Manager, dev config.TVDeviceConfig, met *deviceMetrics) *deviceWorker {
@@ -408,20 +427,21 @@ func newDeviceWorker(parent context.Context, mgr *Manager, dev config.TVDeviceCo
 		id = dev.ScreenID
 	}
 	return &deviceWorker{
-		mgr:           mgr,
-		metrics:       met,
-		ctx:           ctx,
-		cancel:        cancel,
-		done:          make(chan struct{}),
-		id:            id,
-		screenID:      dev.ScreenID,
-		name:          dev.Name,
-		platform:      dev.Platform,
-		ip:            dev.IP,
-		loungeToken:   dev.LoungeToken,
-		state:         "connecting",
-		savedVolume:   50,
-		playbackSpeed: 1.0,
+		mgr:              mgr,
+		metrics:          met,
+		ctx:              ctx,
+		cancel:           cancel,
+		done:             make(chan struct{}),
+		id:               id,
+		screenID:         dev.ScreenID,
+		name:             dev.Name,
+		platform:         dev.Platform,
+		ip:               dev.IP,
+		loungeToken:      dev.LoungeToken,
+		state:            "connecting",
+		savedVolume:      50,
+		playbackSpeed:    1.0,
+		lastContentSpeed: 1.0,
 	}
 }
 
@@ -586,14 +606,23 @@ func (w *deviceWorker) run() {
 			_ = sess.GetNowPlaying(cctx)
 		}()
 
-		subErr := sess.Subscribe(w.ctx, func(evType string, args []json.RawMessage) {
-			w.handleEvent(sess, evType, args)
-		})
+		// Google BrowserChannel GET streams cleanly roll over (EOF -> nil) every ~4.5 minutes.
+		// Re-subscribe immediately on the same SID/gsession so there is zero monitoring gap.
+		var subErr error
+		for w.ctx.Err() == nil && sess.Connected() {
+			subErr = sess.Subscribe(w.ctx, func(evType string, args []json.RawMessage) {
+				w.handleEvent(sess, evType, args)
+			})
+			if subErr != nil {
+				break
+			}
+		}
 
 		w.mu.Lock()
 		w.clearTimersLocked()
 		w.activeSess = nil
 		w.adActive = false
+		w.contentPlaying = false
 		if errors.Is(subErr, ErrTokenExpired) {
 			w.loungeToken = ""
 		}
@@ -685,116 +714,542 @@ func (w *deviceWorker) handleEvent(sess *Session, eventType string, args []json.
 
 	case "adPlaying":
 		contentVid := asString(data["contentVideoId"])
-		if sbEnabled && contentVid != "" {
-			go func() {
-				pctx, cancel := context.WithTimeout(w.ctx, 8*time.Second)
-				defer cancel()
-				_, _ = w.mgr.sb.GetSegments(pctx, contentVid, sbCats)
-			}()
-		}
-
 		skipEnabled := asBool(data["isSkipEnabled"])
 		skippable := asBool(data["isSkippable"])
 		adTitle := asString(data["adTitle"])
+		adCurTime := asFloat(data["currentTime"], 0)
+		adDur := asFloat(data["duration"], 0)
+		now := time.Now()
 
 		w.mu.Lock()
-		w.adActive = true
-		if w.seekTimer != nil {
-			w.seekTimer.Stop()
-			w.seekTimer = nil
+		w.enterAdStateLocked(now)
+		if contentVid != "" {
+			if contentVid != w.lastVideoID {
+				w.setContentVideoLocked(contentVid)
+			}
+			w.adTargetVideo = contentVid
 		}
-		if w.adSkipTimer != nil {
-			w.adSkipTimer.Stop()
-			w.adSkipTimer = nil
+		prefetchVid := w.adTargetVideo
+		w.adSkippable = skippable
+		if adTitle != "" {
+			w.adTitle = adTitle
 		}
-		if skipAds && !skipEnabled && skippable {
-			// Fallback timer for Samsung Tizen / Google TV builds that delay onAdStateChange
-			w.adSkipTimer = time.AfterFunc(5200*time.Millisecond, func() {
-				w.mu.Lock()
-				stillAd := w.adActive
-				w.mu.Unlock()
-				if stillAd {
-					w.triggerSkipAd(sess, adTitle)
-				}
-			})
+		w.adCurrentTime = adCurTime
+		if adDur > 0 {
+			w.adDuration = adDur
 		}
-		w.mu.Unlock()
 
 		if skipAds && skipEnabled {
+			if w.adSkipTimer != nil {
+				w.adSkipTimer.Stop()
+				w.adSkipTimer = nil
+			}
+			w.mu.Unlock()
 			go w.triggerSkipAd(sess, adTitle)
-		} else if muteAds {
-			go w.triggerMuteAd(sess, true, adTitle)
+		} else {
+			if skipAds {
+				w.scheduleAdBypassLocked(sess, adCurTime)
+			}
+			w.mu.Unlock()
+			if muteAds {
+				go w.triggerMuteAd(sess, true, adTitle)
+			}
+		}
+
+		if sbEnabled && prefetchVid != "" {
+			go func(vid string) {
+				pctx, cancel := context.WithTimeout(w.ctx, 8*time.Second)
+				defer cancel()
+				_, _ = w.mgr.sb.GetSegments(pctx, vid, sbCats)
+			}(prefetchVid)
 		}
 
 	case "onAdStateChange":
 		adState := asString(data["adState"])
-		curTime := asString(data["currentTime"])
+		curTimeStr := asString(data["currentTime"])
+		adCurTime, hasAdTime := optionalFloat(data["currentTime"])
 		skipEnabled := asBool(data["isSkipEnabled"])
+		now := time.Now()
 
-		if adState == "0" && curTime != "0" && curTime != "" {
+		if adState == "0" {
 			w.mu.Lock()
 			w.adActive = false
+			w.adTitle = ""
+			w.adSkippable = false
 			if w.adSkipTimer != nil {
 				w.adSkipTimer.Stop()
 				w.adSkipTimer = nil
 			}
+			shouldUnmute := curTimeStr != "0" && curTimeStr != "" && w.mutedByShield
 			w.mu.Unlock()
-			go w.triggerMuteAd(sess, false, "")
+			if shouldUnmute {
+				go w.triggerMuteAd(sess, false, "")
+			}
 		} else if skipAds && skipEnabled {
 			w.mu.Lock()
+			title := w.adTitle
 			if w.adSkipTimer != nil {
 				w.adSkipTimer.Stop()
 				w.adSkipTimer = nil
 			}
 			w.mu.Unlock()
-			go w.triggerSkipAd(sess, "")
-		} else if muteAds && adState != "0" {
+			go w.triggerSkipAd(sess, title)
+		} else {
 			w.mu.Lock()
-			w.adActive = true
+			w.enterAdStateLocked(now)
+			if hasAdTime {
+				w.adCurrentTime = adCurTime
+			}
+			title := w.adTitle
+			if skipAds && w.adSkipTimer == nil {
+				w.scheduleAdBypassLocked(sess, w.adCurrentTime)
+			}
 			w.mu.Unlock()
-			go w.triggerMuteAd(sess, true, "")
+			if muteAds {
+				go w.triggerMuteAd(sess, true, title)
+			}
 		}
 
-	case "nowPlaying", "onStateChange":
+	case "onStateChange":
+		// IMPORTANT: Samsung Tizen & Google TV emit onStateChange(state="1") when an AD starts playing!
+		// Never clear adActive inside onStateChange; only update content playback when !adActive.
 		state := asString(data["state"])
-		vid := asString(data["videoId"])
 		curTime, hasTime := optionalFloat(data["currentTime"])
+		dur, hasDur := optionalFloat(data["duration"])
 		eventReceived := time.Now()
 
 		w.mu.Lock()
-		if vid != "" {
-			w.currentVideo = vid
-		} else if eventType == "nowPlaying" {
-			if _, exists := data["videoId"]; exists {
-				w.currentVideo = ""
-			}
+		if state == "1081" || (hasDur && w.looksLikeAdDurationLocked(dur)) {
+			w.enterAdStateLocked(eventReceived)
 		}
-		activeVid := w.currentVideo
+		if w.adActive {
+			if hasTime {
+				w.adCurrentTime = curTime
+			}
+			if hasDur && dur > 0 {
+				w.adDuration = dur
+			}
+			title := w.adTitle
+			if skipAds && w.adSkipTimer == nil {
+				w.scheduleAdBypassLocked(sess, w.adCurrentTime)
+			}
+			w.mu.Unlock()
+			if muteAds {
+				go w.triggerMuteAd(sess, true, title)
+			}
+			return
+		}
+
 		if w.seekTimer != nil {
 			w.seekTimer.Stop()
 			w.seekTimer = nil
 		}
 
+		var needUnmute, doSeek bool
+		var seekPos float64
+		activeVid := w.currentVideo
+
 		if state == "1" {
-			w.adActive = false
-			if w.adSkipTimer != nil {
-				w.adSkipTimer.Stop()
-				w.adSkipTimer = nil
-			}
 			w.state = "playing"
-		} else if !w.adActive {
+			w.contentPlaying = true
+			if hasTime {
+				w.lastContentPos = curTime
+				w.lastContentSpeed = w.playbackSpeed
+				w.lastPosAt = eventReceived
+				w.hasContentPos = true
+			}
+			if hasDur && dur > 0 {
+				w.lastContentDur = dur
+			}
+			if w.lastBypassVid != "" && w.lastBypassVid == activeVid && time.Since(w.lastBypassAt) > 4*time.Second {
+				w.lastBypassVid = ""
+			}
+			needUnmute = w.mutedByShield
+			doSeek, seekPos = w.consumePendingSeekLocked(curTime, hasTime)
+		} else {
+			if hasTime && w.hasContentPos {
+				w.lastContentPos = curTime
+				w.lastPosAt = eventReceived
+			}
+			w.contentPlaying = false
 			w.state = "connected"
 		}
-		needUnmute := state == "1" && w.mutedByShield
 		w.mu.Unlock()
 
 		if needUnmute {
 			go w.triggerMuteAd(sess, false, "")
 		}
-		if state == "1" && sbEnabled && activeVid != "" && hasTime {
-			go w.scheduleSponsorSkip(sess, activeVid, curTime, sbCats, eventReceived)
+		if doSeek {
+			go func(pos float64) {
+				cctx, cancel := context.WithTimeout(w.ctx, 5*time.Second)
+				defer cancel()
+				_ = sess.SeekTo(cctx, pos)
+			}(seekPos)
+		}
+		if state == "1" && sbEnabled && activeVid != "" && (hasTime || doSeek) {
+			posForSB := curTime
+			if doSeek {
+				posForSB = seekPos
+			}
+			go w.scheduleSponsorSkip(sess, activeVid, posForSB, sbCats, eventReceived)
+		}
+
+	case "nowPlaying":
+		state := asString(data["state"])
+		vid := asString(data["videoId"])
+		adVid := asString(data["adVideoId"])
+		adState := asString(data["adState"])
+		curTime, hasTime := optionalFloat(data["currentTime"])
+		dur, hasDur := optionalFloat(data["duration"])
+		eventReceived := time.Now()
+
+		w.mu.Lock()
+		if vid != "" && vid != adVid {
+			if vid != w.lastVideoID {
+				w.setContentVideoLocked(vid)
+			}
+			w.currentVideo = vid
+		}
+
+		isAdNow := (adState != "" && adState != "0") || adVid != "" || state == "1081" || (hasDur && w.looksLikeAdDurationLocked(dur))
+		if isAdNow {
+			w.enterAdStateLocked(eventReceived)
+			if vid != "" && vid != adVid {
+				w.adTargetVideo = vid
+			}
+			if hasTime {
+				w.adCurrentTime = curTime
+			}
+			if hasDur && dur > 0 {
+				w.adDuration = dur
+			}
+			title := w.adTitle
+			if skipAds && w.adSkipTimer == nil {
+				w.scheduleAdBypassLocked(sess, w.adCurrentTime)
+			}
+			w.mu.Unlock()
+			if muteAds {
+				go w.triggerMuteAd(sess, true, title)
+			}
+			return
+		}
+
+		if vid == "" && adVid == "" {
+			if _, exists := data["videoId"]; exists || len(data) == 0 {
+				w.adActive = false
+				w.currentVideo = ""
+				w.contentPlaying = false
+				w.state = "connected"
+				if w.adSkipTimer != nil {
+					w.adSkipTimer.Stop()
+					w.adSkipTimer = nil
+				}
+				if w.seekTimer != nil {
+					w.seekTimer.Stop()
+					w.seekTimer = nil
+				}
+				needUnmute := w.mutedByShield
+				w.mu.Unlock()
+				if needUnmute {
+					go w.triggerMuteAd(sess, false, "")
+				}
+				return
+			}
+		}
+
+		if vid != "" && hasDur && dur > 0 {
+			w.adActive = false
+			if w.adSkipTimer != nil {
+				w.adSkipTimer.Stop()
+				w.adSkipTimer = nil
+			}
+		}
+
+		if w.adActive {
+			w.mu.Unlock()
+			return
+		}
+
+		if w.seekTimer != nil {
+			w.seekTimer.Stop()
+			w.seekTimer = nil
+		}
+
+		var needUnmute, doSeek bool
+		var seekPos float64
+		activeVid := w.currentVideo
+
+		if state == "1" {
+			w.state = "playing"
+			w.contentPlaying = true
+			if hasTime {
+				w.lastContentPos = curTime
+				w.lastContentSpeed = w.playbackSpeed
+				w.lastPosAt = eventReceived
+				w.hasContentPos = true
+			}
+			if hasDur && dur > 0 {
+				w.lastContentDur = dur
+			}
+			if w.lastBypassVid != "" && w.lastBypassVid == activeVid && time.Since(w.lastBypassAt) > 4*time.Second {
+				w.lastBypassVid = ""
+			}
+			needUnmute = w.mutedByShield
+			doSeek, seekPos = w.consumePendingSeekLocked(curTime, hasTime)
+		} else {
+			w.contentPlaying = false
+			w.state = "connected"
+		}
+		w.mu.Unlock()
+
+		if needUnmute {
+			go w.triggerMuteAd(sess, false, "")
+		}
+		if doSeek {
+			go func(pos float64) {
+				cctx, cancel := context.WithTimeout(w.ctx, 5*time.Second)
+				defer cancel()
+				_ = sess.SeekTo(cctx, pos)
+			}(seekPos)
+		}
+		if state == "1" && sbEnabled && activeVid != "" && (hasTime || doSeek) {
+			posForSB := curTime
+			if doSeek {
+				posForSB = seekPos
+			}
+			go w.scheduleSponsorSkip(sess, activeVid, posForSB, sbCats, eventReceived)
 		}
 	}
+}
+
+func (w *deviceWorker) looksLikeAdDurationLocked(dur float64) bool {
+	return dur > 0 && w.lastContentDur > 0 && dur < w.lastContentDur*0.5
+}
+
+func (w *deviceWorker) positionBeforeAdLocked(now time.Time) float64 {
+	if !w.hasContentPos {
+		return 0
+	}
+	if !w.contentPlaying {
+		return math.Max(0, w.lastContentPos)
+	}
+	elapsed := now.Sub(w.lastPosAt).Seconds()
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	spd := w.lastContentSpeed
+	if spd <= 0 {
+		spd = 1.0
+	}
+	pos := w.lastContentPos + elapsed*spd
+	if w.lastContentDur > 0 && pos > w.lastContentDur {
+		pos = w.lastContentDur
+	}
+	return math.Max(0, pos)
+}
+
+func (w *deviceWorker) enterAdStateLocked(now time.Time) {
+	if w.seekTimer != nil {
+		w.seekTimer.Stop()
+		w.seekTimer = nil
+	}
+	if w.adActive {
+		return
+	}
+	pos := w.positionBeforeAdLocked(now)
+	w.lastContentPos = pos
+	w.lastPosAt = now
+	w.contentPlaying = false
+	w.adActive = true
+	w.adBreakStart = now
+	w.adTargetVideo = w.lastVideoID
+	w.adResumePos = pos
+	w.adCurrentTime = 0
+	w.adDuration = 0
+}
+
+func (w *deviceWorker) setContentVideoLocked(vid string) {
+	if vid == "" || vid == w.lastVideoID {
+		return
+	}
+	if w.pendingSeekVideo != "" && w.pendingSeekVideo != vid {
+		w.pendingSeekVideo = ""
+		w.pendingSeekPos = 0
+	}
+	w.lastVideoID = vid
+	w.currentVideo = vid
+	w.lastContentDur = 0
+	w.lastContentPos = 0
+	w.hasContentPos = false
+	w.contentPlaying = false
+	if w.adActive {
+		w.adTargetVideo = vid
+		w.adResumePos = 0
+	}
+}
+
+func (w *deviceWorker) consumePendingSeekLocked(curTime float64, hasTime bool) (bool, float64) {
+	if w.pendingSeekVideo == "" || w.pendingSeekVideo != w.currentVideo || w.pendingSeekPos <= 0 {
+		return false, 0
+	}
+	pos := w.pendingSeekPos
+	w.pendingSeekVideo = ""
+	w.pendingSeekPos = 0
+	if hasTime && math.Abs(curTime-pos) < 2.5 {
+		return false, 0
+	}
+	return true, pos
+}
+
+func (w *deviceWorker) scheduleAdBypassLocked(sess *Session, adCurTime float64) {
+	if w.adSkipTimer != nil {
+		w.adSkipTimer.Stop()
+		w.adSkipTimer = nil
+	}
+	targetWait := 5.15
+	if w.bypassWaitSec > 0 {
+		targetWait = w.bypassWaitSec
+	}
+	minDelay := 0.20
+	if w.bypassWaitSec > 0 && w.bypassWaitSec < minDelay {
+		minDelay = w.bypassWaitSec
+	}
+	delaySec := math.Max(minDelay, targetWait-adCurTime)
+	w.adSkipTimer = time.AfterFunc(time.Duration(delaySec*float64(time.Second)), func() {
+		w.executeAdBypass(sess)
+	})
+}
+
+func (w *deviceWorker) executeAdBypass(sess *Session) {
+	w.mu.Lock()
+	if !w.adActive || w.ctx.Err() != nil {
+		w.mu.Unlock()
+		return
+	}
+	shortBumper := w.adDuration > 0 && w.adDuration <= 5.6 && time.Since(w.adBreakStart) < 6500*time.Millisecond
+	adTitle := w.adTitle
+	w.mu.Unlock()
+
+	if shortBumper {
+		// Let a 5-second bumper finish naturally rather than causing a playlist reload flash
+		if !w.sleep(850 * time.Millisecond) {
+			return
+		}
+		w.mu.Lock()
+		stillAd := w.adActive
+		w.mu.Unlock()
+		if !stillAd {
+			return
+		}
+	}
+
+	// Step 1: Try native skipAd RPC first (succeeds cleanly if the TV unlocked Skip at 5s without emitting an event)
+	cctx, cancel := context.WithTimeout(w.ctx, 5*time.Second)
+	_ = sess.SkipAd(cctx)
+	cancel()
+
+	settledWait := 420 * time.Millisecond
+	w.mu.Lock()
+	if w.bypassWaitSec > 0 && w.bypassWaitSec < 1.0 {
+		settledWait = 60 * time.Millisecond
+	}
+	w.mu.Unlock()
+
+	if !w.sleep(settledWait) {
+		return
+	}
+
+	w.mu.Lock()
+	if !w.adActive {
+		// Native skipAd closed the ad!
+		needUnmute := w.mutedByShield
+		vol := w.savedVolume
+		if needUnmute {
+			w.mutedByShield = false
+			w.tvMuted = false
+		}
+		w.state = "playing"
+		devName := w.name
+		detail := "Auto-skipped YouTube TV ad"
+		if adTitle != "" {
+			detail = fmt.Sprintf("Auto-skipped ad (%s)", adTitle)
+		}
+		w.lastAction = detail
+		w.lastAdSkipAt = time.Now()
+		w.mu.Unlock()
+
+		if needUnmute {
+			uctx, ucancel := context.WithTimeout(w.ctx, 5*time.Second)
+			_ = sess.SetVolume(uctx, vol, false)
+			ucancel()
+		}
+		w.recordSkipMetric(devName, detail)
+		return
+	}
+
+	// Step 2: Unskippable 15s-60s ad pod is still active -> force-close it via setPlaylist ("ad dance")!
+	targetVid := w.adTargetVideo
+	if targetVid == "" {
+		targetVid = w.lastVideoID
+	}
+	resumePos := w.adResumePos
+	devName := w.name
+
+	if targetVid == "" {
+		w.mu.Unlock()
+		return
+	}
+	if w.lastBypassVid == targetVid && time.Since(w.lastBypassAt) < 20*time.Second {
+		// Safety guard: never enter a reload loop if YouTube refuses early bypass on a specific video
+		w.mu.Unlock()
+		return
+	}
+	if time.Since(w.lastAdSkipAt) < 1200*time.Millisecond {
+		w.mu.Unlock()
+		return
+	}
+
+	w.lastAdSkipAt = time.Now()
+	w.lastBypassVid = targetVid
+	w.lastBypassAt = time.Now()
+	if resumePos > 1.0 {
+		w.pendingSeekVideo = targetVid
+		w.pendingSeekPos = resumePos
+	}
+	detail := "Force-skipped unskippable TV ad"
+	if adTitle != "" {
+		detail = fmt.Sprintf("Force-skipped unskippable ad (%s)", adTitle)
+	}
+	w.lastAction = detail
+	w.mu.Unlock()
+
+	pctx, pcancel := context.WithTimeout(w.ctx, 5*time.Second)
+	err := sess.PlayVideo(pctx, targetVid, resumePos)
+	pcancel()
+	if err != nil {
+		w.mu.Lock()
+		if w.pendingSeekVideo == targetVid {
+			w.pendingSeekVideo = ""
+			w.pendingSeekPos = 0
+		}
+		w.mu.Unlock()
+		w.mgr.log.Debug("force-bypass setPlaylist failed", "tv", devName, "err", err)
+		return
+	}
+
+	w.mgr.log.Info("Force-skipped unskippable YouTube TV ad", "tv", devName, "video", targetVid, "resumeSec", resumePos)
+	w.recordSkipMetric(devName, detail)
+}
+
+func (w *deviceWorker) recordSkipMetric(devName, detail string) {
+	w.metrics.adsSkipped.Add(1)
+	w.mgr.totalAdsSkipped.Add(1)
+	w.mgr.recordEvent(TVEvent{
+		DeviceID:   w.id,
+		DeviceName: devName,
+		Action:     "ad_skipped",
+		Details:    detail,
+	})
 }
 
 func (w *deviceWorker) triggerSkipAd(sess *Session, adTitle string) {
@@ -804,7 +1259,6 @@ func (w *deviceWorker) triggerSkipAd(sess *Session, adTitle string) {
 		return
 	}
 	w.lastAdSkipAt = time.Now()
-	w.adActive = false
 	needUnmute := w.mutedByShield
 	vol := w.savedVolume
 	if needUnmute {
@@ -831,14 +1285,17 @@ func (w *deviceWorker) triggerSkipAd(sess *Session, adTitle string) {
 		_ = sess.SetVolume(cctx, vol, false)
 	}
 
-	w.metrics.adsSkipped.Add(1)
-	w.mgr.totalAdsSkipped.Add(1)
 	w.mgr.log.Info("Skipped YouTube TV ad", "tv", devName)
-	w.mgr.recordEvent(TVEvent{
-		DeviceID:   w.id,
-		DeviceName: devName,
-		Action:     "ad_skipped",
-		Details:    detail,
+	w.recordSkipMetric(devName, detail)
+
+	// Safety follow-up: if TV moved into a 2nd unskippable ad in the pod and adActive is still true 950ms later
+	time.AfterFunc(950*time.Millisecond, func() {
+		w.mu.Lock()
+		stillAd := w.adActive
+		w.mu.Unlock()
+		if stillAd {
+			w.executeAdBypass(sess)
+		}
 	})
 }
 

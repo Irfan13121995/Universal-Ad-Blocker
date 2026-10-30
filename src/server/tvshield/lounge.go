@@ -229,18 +229,20 @@ type Session struct {
 	screenName  string
 	deviceModel string
 
-	cmdMu     sync.Mutex
-	cmdOffset int
+	cmdMu        sync.Mutex
+	cmdOffset    int
+	cmdMsgOffset int
 }
 
 // NewSession constructs a Session for a paired Smart TV.
 func (c *LoungeClient) NewSession(screenID, loungeToken string) *Session {
 	return &Session{
-		client:      c,
-		ScreenID:    screenID,
-		LoungeToken: loungeToken,
-		ClientName:  loungeClientName,
-		cmdOffset:   1,
+		client:       c,
+		ScreenID:     screenID,
+		LoungeToken:  loungeToken,
+		ClientName:   loungeClientName,
+		cmdOffset:    1,
+		cmdMsgOffset: 1,
 	}
 }
 
@@ -322,6 +324,7 @@ func (s *Session) Connect(ctx context.Context, onEvent EventHandler) error {
 
 	s.cmdMu.Lock()
 	s.cmdOffset = 1
+	s.cmdMsgOffset = 1
 	s.cmdMu.Unlock()
 
 	if !s.Connected() {
@@ -553,7 +556,7 @@ func (s *Session) handleLoungeStatus(args []json.RawMessage) error {
 	return nil
 }
 
-// Command sends an MDX RPC command (such as skipAd, setVolume, seekTo) to the connected TV.
+// Command sends an MDX RPC command (such as skipAd, setVolume, seekTo, setPlaylist) to the connected TV.
 func (s *Session) Command(ctx context.Context, command string, params map[string]string) error {
 	if !s.Connected() {
 		return ErrSessionGone
@@ -562,7 +565,8 @@ func (s *Session) Command(ctx context.Context, command string, params map[string
 	s.cmdMu.Lock()
 	defer s.cmdMu.Unlock()
 
-	ofs := s.cmdOffset
+	ofs := s.cmdMsgOffset
+	s.cmdMsgOffset++
 	s.cmdOffset++
 	rid := s.cmdOffset
 
@@ -598,6 +602,18 @@ func (s *Session) Command(ctx context.Context, command string, params map[string
 // SkipAd instructs the TV to immediately skip a skippable YouTube video ad.
 func (s *Session) SkipAd(ctx context.Context) error {
 	return s.Command(ctx, "skipAd", nil)
+}
+
+// PlayVideo loads videoID at currentTimeSec via setPlaylist (used to force-close unskippable ad pods after 5s).
+func (s *Session) PlayVideo(ctx context.Context, videoID string, currentTimeSec float64) error {
+	timeStr := "0"
+	if currentTimeSec > 0.05 {
+		timeStr = strconv.FormatFloat(currentTimeSec, 'f', 2, 64)
+	}
+	return s.Command(ctx, "setPlaylist", map[string]string{
+		"videoId":     videoID,
+		"currentTime": timeStr,
+	})
 }
 
 // SetVolume updates the TV's YouTube volume (0-100) and mute state.

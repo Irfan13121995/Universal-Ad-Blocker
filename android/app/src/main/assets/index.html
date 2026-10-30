@@ -1871,7 +1871,7 @@
               <span>Smart TV YouTube Shield (Google TV &amp; Samsung Tizen)</span>
             </div>
             <div class="panel-sub" style="margin-bottom:0;">
-              Certificate-less YouTube Lounge controller: auto-skips video ads in milliseconds, mutes unskippable ads, and skips SponsorBlock segments across multiple TVs simultaneously.
+              Certificate-less YouTube Lounge controller: auto-skips skippable ads instantly, mutes &amp; force-closes unskippable 30–60s ad pods after ~5s, and skips SponsorBlock segments across multiple TVs simultaneously.
             </div>
           </div>
 
@@ -1961,8 +1961,8 @@
         <div style="margin-top:1.35rem; padding-top:1.15rem; border-top:1px solid var(--glass-border); display:flex; flex-direction:column; gap:0.75rem;">
           <label class="apple-switch" style="justify-content:space-between; width:100%; border-radius:var(--radius-md); padding:0.7rem 1rem; background:rgba(0,0,0,0.2);">
             <div>
-              <div style="font-weight:600; font-size:0.88rem;">Auto-Skip Skippable Video Ads</div>
-              <div style="font-size:0.74rem; color:var(--text-secondary); font-weight:normal;">Triggers instant Skip the millisecond YouTube's skip button unlocks on Google TV &amp; Samsung Tizen.</div>
+              <div style="font-weight:600; font-size:0.88rem;">Auto-Skip Skippable &amp; Force-Bypass Unskippable Ads</div>
+              <div style="font-size:0.74rem; color:var(--text-secondary); font-weight:normal;">Clicks Skip instantly when unlocked, and force-closes unskippable 15–60s TV ad pods after ~5s (resuming your exact playback timestamp).</div>
             </div>
             <input type="checkbox" id="tvSkipAdsToggle" checked onchange="saveTVConfig()">
             <div class="apple-switch-track"><div class="apple-switch-thumb"></div></div>
@@ -1970,8 +1970,8 @@
 
           <label class="apple-switch" style="justify-content:space-between; width:100%; border-radius:var(--radius-md); padding:0.7rem 1rem; background:rgba(0,0,0,0.2);">
             <div>
-              <div style="font-weight:600; font-size:0.88rem;">Auto-Mute Unskippable Ads &amp; Restore Volume</div>
-              <div style="font-size:0.74rem; color:var(--text-secondary); font-weight:normal;">Silences unskippable prerolls/midrolls immediately and restores your exact TV volume when the video begins.</div>
+              <div style="font-weight:600; font-size:0.88rem;">Auto-Mute During 5s Ad Countdown &amp; Restore Volume</div>
+              <div style="font-size:0.74rem; color:var(--text-secondary); font-weight:normal;">Silences ad audio at 0.0s while awaiting skip/force-bypass, then restores your exact TV volume automatically.</div>
             </div>
             <input type="checkbox" id="tvMuteAdsToggle" checked onchange="saveTVConfig()">
             <div class="apple-switch-track"><div class="apple-switch-thumb"></div></div>
@@ -2011,6 +2011,9 @@
             <div>• <strong>Wi-Fi Router (Protects All Devices):</strong> Open <code>http://192.168.68.1</code> (or your router app) &gt; <strong>DHCP / DNS</strong> &gt; Set Primary DNS to <code id="tvDnsIpInline3">192.168.68.51</code>.</div>
             <div>• <strong>Google TV / Android TV:</strong> <em>Settings &gt; Network &amp; Internet &gt; [Your Wi-Fi] &gt; IP settings &gt; Static</em> &gt; Keep IP &amp; Gateway (<code>192.168.68.1</code>) &gt; Set <strong>DNS 1</strong> &amp; <strong>DNS 2</strong> to <code>192.168.68.51</code>.</div>
             <div>• <strong>Samsung Smart TV (Tizen OS):</strong> <em>Settings &gt; All Settings &gt; Connection &gt; Network &gt; Network Status &gt; IP Settings &gt; DNS Setting &gt; Enter manually</em> &gt; Enter <code>192.168.68.51</code> &gt; OK.</div>
+            <div style="padding-top:0.45rem; border-top:1px solid var(--glass-border); color:var(--text-secondary);">
+              💡 <strong>Want 0.0-second pre-frame blocking?</strong> On official TV YouTube apps, YouTube's servers require ~5s of muted ad time before allowing remote force-skip. For 0-second client-side blocking, you can optionally sideload <strong>TizenTube</strong> (via TizenBrewInstaller) on Samsung Tizen or <strong>SmartTube</strong> on Google TV alongside Sinkhole DNS.
+            </div>
           </div>
         </details>
       </div>
